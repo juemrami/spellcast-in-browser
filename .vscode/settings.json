@@ -1,0 +1,22 @@
+{
+	"files.exclude": {
+		"**/.git": true,
+		"**/.svn": true,
+		"**/.hg": true,
+		"**/.DS_Store": true,
+		"**/Thumbs.db": true,
+		"**/.jj": true
+	},
+	"hide-files.files": [],
+	"js/ts.experimental.useTsgo": true,
+	"js/ts.tsdk.path": "node_modules/.bin/tsgo",
+	"editor.codeActionsOnSave": {
+		"source.fixAll.oxc": "always",
+		"source.removeUnusedImports": "always",
+		"source.organizeImports": "always"
+	},
+	"oxc.path.oxlint": "node_modules/.bin/oxlint",
+	"editor.defaultFormatter": "dprint.dprint",
+	"dprint.path": "node_modules/.bin/dprint",
+	"editor.formatOnSave": true,
+}

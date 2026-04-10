@@ -1,0 +1,47 @@
+{
+	"$schema": "https://raw.githubusercontent.com/Effect-TS/tsgo/refs/heads/main/schema.json",
+	"compilerOptions": {
+		// solidjs
+		"jsx": "preserve",
+		"jsxImportSource": "solid-js",
+		// General
+		"target": "ESNext",
+		"incremental": true,
+		"composite": true,
+		"noErrorTruncation": true, // Do not truncate error messages.
+		"erasableSyntaxOnly": true, // Allows to run directly with node and type removal
+		// Modules
+		"allowSyntheticDefaultImports": true,
+		"allowImportingTsExtensions": true,
+		"esModuleInterop": true,
+		// "esModuleInterop": false, // Do not fiddle with import/export statements
+		"isolatedModules": true,
+		"resolveJsonModule": true,
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"moduleDetection": "force", // Treat every non-declaration file as a module.
+		"verbatimModuleSyntax": true, // Only transform/eliminate type-only import/export statements.
+		"noEmit": true,
+		// Type Checking & Safety
+		"allowJs": false,
+		"strictNullChecks": true,
+		"strict": true,
+		"types": [
+			"vite/client"
+		],
+		"exactOptionalPropertyTypes": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUnusedLocals": true,
+		"noImplicitOverride": true,
+		"skipLibCheck": true, // Skip type checking of third party libraries.
+		// Use incremental builds with project references.
+	},
+	"plugins": [
+		{
+			"name": "@effect/language-service",
+		}
+	],
+	"include": [
+		"src/**/*"
+	]
+}
