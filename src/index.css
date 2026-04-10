@@ -1,1 +1,108 @@
-@import 'tailwindcss';
+@import url("https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,600..900&display=swap");
+@import "tailwindcss";
+
+
+@theme {
+	--font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+	--font-body: "Alegreya Sans", "Trebuchet MS", "Verdana", sans-serif;
+	--color-browser: #f2e4cc;
+	--color-page-50: #fbf5ea;
+	--color-page-100: #f7eddc;
+	--color-page-200: #f1e4cb;
+	--color-paper-50: #fffaf2;
+	--color-paper-100: #f8efdf;
+	--color-paper-200: #ecdcc0;
+	--color-paper-300: #d9c09a;
+	--color-shell: #d8c3a4;
+	--color-ink: #342418;
+	--color-ink-soft: #6d5642;
+	--color-header: #2f2116;
+	--color-description: #6c5644;
+	--color-label: #8f7057;
+	--color-label-soft: #9a7556;
+	--color-label-muted: #a17e5c;
+	--color-label-faint: #c5af93;
+	--color-badge: #7d6247;
+	--color-glow-rose: #eba4b1;
+	--color-glow-mint: #cfe4db;
+	--color-glow-sun: #efd29b;
+	--color-tile-normal-border: #d8c6aa;
+	--color-tile-normal-from: #fff9ef;
+	--color-tile-normal-via: #fbf1dd;
+	--color-tile-normal-to: #efe0c5;
+	--color-tile-normal-hover-from: #fffdf7;
+	--color-tile-normal-hover-via: #fbf4e6;
+	--color-tile-normal-hover-to: #f0e2c9;
+	--color-tile-normal-text: #39281b;
+	--color-tile-gem-border: #d89ca4;
+	--color-tile-gem-from: #f7d1d5;
+	--color-tile-gem-via: #f2b0bd;
+	--color-tile-gem-to: #e5909e;
+	--color-tile-gem-hover-from: #f9dde0;
+	--color-tile-gem-hover-via: #f4bfca;
+	--color-tile-gem-hover-to: #eaa0ae;
+	--color-tile-gem-text: #5f2431;
+	--color-tile-multiplier-border: #9fbbb2;
+	--color-tile-multiplier-from: #d9ede4;
+	--color-tile-multiplier-via: #b8ddd0;
+	--color-tile-multiplier-to: #9bcfcd;
+	--color-tile-multiplier-hover-from: #e2f2ea;
+	--color-tile-multiplier-hover-via: #c3e4d8;
+	--color-tile-multiplier-hover-to: #a9d8d7;
+	--color-tile-multiplier-text: #24413f;
+	--color-control-border: #c8ad83;
+	--color-control-from: #f8e3c6;
+	--color-control-to: #e9c69a;
+	--color-control-text: #4d3524;
+}
+
+:root {
+	color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+	min-height: 100%;
+}
+
+html {
+	background: var(--color-paper-100);
+}
+
+body {
+	margin: 0;
+	color: var(--color-ink);
+	font-family: var(--font-body);
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	background:
+		radial-gradient(circle at 15% 18%, color-mix(in srgb, var(--color-glow-rose) 32%, transparent) 0, transparent 24%),
+		radial-gradient(circle at 84% 12%, color-mix(in srgb, var(--color-glow-mint) 38%, transparent) 0, transparent 24%),
+		radial-gradient(circle at 50% 104%, color-mix(in srgb, var(--color-glow-sun) 50%, transparent) 0, transparent 30%),
+		linear-gradient(180deg, var(--color-page-50) 0%, var(--color-page-100) 46%, var(--color-page-200) 100%);
+	background-attachment: fixed;
+}
+
+body::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	background:
+		repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-ink) 3%, transparent) 0 1px, transparent 1px 6px),
+		radial-gradient(circle at top, color-mix(in srgb, var(--color-paper-50) 38%, transparent), transparent 50%);
+	opacity: 0.7;
+	mix-blend-mode: multiply;
+}
+
+::selection {
+	background: color-mix(in srgb, var(--color-glow-rose) 28%, transparent);
+	color: var(--color-ink);
+}

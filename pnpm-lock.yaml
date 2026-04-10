@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@effect/atom-solid':
+        specifier: 4.0.0-beta.46
+        version: 4.0.0-beta.46(effect@4.0.0-beta.46)(solid-js@1.9.9)
       effect:
         specifier: 4.0.0-beta.46
         version: 4.0.0-beta.46
@@ -190,6 +193,12 @@ packages:
     resolution: {integrity: sha512-xdOOm4ZG9pqKdnVvgFMp8/c9Ylkt2LcTFqjmxF1CoCZNNYGMUrH60YQl/M9R9wJXSSQOv6K+7Ub+hOWcIlxIjw==}
     cpu: [x64]
     os: [win32]
+
+  '@effect/atom-solid@4.0.0-beta.46':
+    resolution: {integrity: sha512-jdzvylFKt7BEXPkr4c/8Ldtuntkt8Nn50hgfAp7eJlGyu+6PvfG0OwQ9KYexacWztaxIz+eXq/L/hqZ3joCDCg==}
+    peerDependencies:
+      effect: ^4.0.0-beta.46
+      solid-js: '>=1 <2'
 
   '@effect/language-service@0.85.1':
     resolution: {integrity: sha512-EXnJjIy6zQ3nUO/MZ+ynWUb8B895KZPotd1++oTs9JjDkplwM7cb6zo8Zq2zU6piwq+KflO7amXbEfj1UMpHkw==}
@@ -1393,6 +1402,11 @@ snapshots:
 
   '@dprint/win32-x64@0.53.2':
     optional: true
+
+  '@effect/atom-solid@4.0.0-beta.46(effect@4.0.0-beta.46)(solid-js@1.9.9)':
+    dependencies:
+      effect: 4.0.0-beta.46
+      solid-js: 1.9.9
 
   '@effect/language-service@0.85.1': {}
 

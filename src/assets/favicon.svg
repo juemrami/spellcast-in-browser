@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 24.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 64 64" style="enable-background:new 0 0 64 64;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:url(#main-bg_1_);}
+	.st1{fill:url(#inner-bg_1_);stroke:#94A3B8;stroke-width:2;}
+	.st2{fill:#7C3AED;}
+	.st3{stroke:#F8FAFC;stroke-width:4;stroke-linecap:round;}
+	.st4{fill:#F97316;}
+	.st5{fill:#22C55E;}
+	.st6{fill:#F8FAFC;}
+	.st7{fill:#0061AF;}
+	.st8{font-family:'System';}
+	.st9{font-size:30px;}
+	.st10{fill:#0F172A;}
+</style>
+<linearGradient id="main-bg_1_" gradientUnits="userSpaceOnUse" x1="9.8841" y1="5.461" x2="54.1159" y2="58.539">
+	<stop  offset="0" style="stop-color:#1E293B"/>
+	<stop  offset="1" style="stop-color:#0F172A"/>
+</linearGradient>
+<path id="main-bg" class="st0" d="M58,64H6c-3.3,0-6-2.7-6-6V6c0-3.3,2.7-6,6-6h52c3.3,0,6,2.7,6,6v52C64,61.3,61.3,64,58,64z"/>
+<g>
+	<linearGradient id="inner-bg_1_" gradientUnits="userSpaceOnUse" x1="0.9539" y1="0.9539" x2="63.0461" y2="63.0461">
+		<stop  offset="0" style="stop-color:#F8FAFC"/>
+		<stop  offset="1" style="stop-color:#CBD5E1"/>
+	</linearGradient>
+	<path id="inner-bg" class="st1" d="M58,60H6c-1.1,0-2-0.9-2-2V6c0-1.1,0.9-2,2-2h52c1.1,0,2,0.9,2,2v52C60,59.1,59.1,60,58,60z"/>
+	<g id="plus-group">
+		<path class="st2" d="M28,30H10c-1.1,0-2-0.9-2-2V10c0-1.1,0.9-2,2-2h18c1.1,0,2,0.9,2,2v18C30,29.1,29.1,30,28,30z"/>
+		<path class="st3" d="M12,19h14 M19,12v14"/>
+	</g>
+	<g id="minus-group">
+		<path class="st4" d="M54.3,30h-18c-1.1,0-2-0.9-2-2V10c0-1.1,0.9-2,2-2h18c1.1,0,2,0.9,2,2v18C56.3,29.1,55.4,30,54.3,30z"/>
+		<path class="st3" d="M38.8,19h13"/>
+	</g>
+	<g id="got-group">
+		<path class="st5" d="M28,54.7H10c-1.1,0-2-0.9-2-2v-18c0-1.1,0.9-2,2-2h18c1.1,0,2,0.9,2,2v18C30,53.8,29.1,54.7,28,54.7z"/>
+		<circle class="st6" cx="19" cy="43.7" r="4"/>
+	</g>
+	<g id="B-group">
+		<text id="B-shadow" transform="matrix(1 0 0 1 33.9449 56.6483)" class="st7 st8 st9">B</text>
+		<text transform="matrix(1 0 0 1 33.1873 55.6523)" class="st10 st8 st9">B</text>
+	</g>
+</g>
+</svg>

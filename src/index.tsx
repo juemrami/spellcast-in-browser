@@ -4,6 +4,18 @@ import "./index.css"
 
 import App from "./App"
 
+const themeColor = getComputedStyle(document.documentElement)
+	.getPropertyValue("--color-browser")
+	.trim()
+
+if (themeColor) {
+	const metaThemeColor = document.querySelector<HTMLMetaElement>("meta[name=\"theme-color\"]") ??
+		document.head.appendChild(document.createElement("meta"))
+
+	metaThemeColor.setAttribute("name", "theme-color")
+	metaThemeColor.setAttribute("content", themeColor)
+}
+
 const root = document.getElementById("root")
 
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
