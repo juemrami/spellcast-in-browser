@@ -23,9 +23,13 @@ export class PlayerGameState extends Context.Service<PlayerGameState>()("spellca
 			}
 			return false
 		}))
+		const clearSelectionPath = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
+			get.set(selectionPath, [])
+		}))
 		return {
 			selectionPath,
-			tryUpdateSelectionPath
+			tryUpdateSelectionPath,
+			clearSelectionPath
 		}
 	})
 }) {

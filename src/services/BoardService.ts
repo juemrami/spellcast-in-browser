@@ -46,15 +46,14 @@ export class BoardService extends Context.Service<BoardService, {
 	readonly tileCount: Atom.Atom<number>
 }>()("spellcast/BoardService") {}
 
-export const boardLayer = Layer.effect(
-	BoardService,
-	Effect.sync(() => {
-		const tiles = Atom.make(createInitialBoard())
-		const tileCount = Atom.make((get) => get(tiles).length)
+export const make = Effect.sync(() => {
+	const tiles = Atom.make(createInitialBoard())
+	const tileCount = Atom.make((get) => get(tiles).length)
 
-		return BoardService.of({
-			tiles,
-			tileCount
-		})
+	return BoardService.of({
+		tiles,
+		tileCount
 	})
-)
+})
+
+export const layerFresh = Layer.fresh(Layer.effect(BoardService, make))
