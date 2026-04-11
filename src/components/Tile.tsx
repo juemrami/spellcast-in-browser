@@ -24,6 +24,7 @@ const getTileStyles = (type: TileType, selected: boolean): string => {
 
 const TileView: Component<{ readonly tile: Tile }> = (props) => {
 	const trySelectTile = useAtomSet(() => playerGameState.tryUpdateSelectionPath)
+	const clearSelectionPath = useAtomSet(() => playerGameState.clearSelectionPath)
 	const isMouseDown = useAtomValue(() => playerGameState.isMouseDown)
 	const isTileSelected = useAtomValue(() =>
 		pipe(
@@ -31,6 +32,15 @@ const TileView: Component<{ readonly tile: Tile }> = (props) => {
 			Atom.transform((get) => {
 				const path = get(playerGameState.selectionPath)
 				return path.some((t) => t.row === props.tile.row && t.col === props.tile.col)
+			})
+		)
+	)
+	const isHeadOfPath = useAtomValue(() =>
+		pipe(
+			playerGameState.selectionPath,
+			Atom.transform((get) => {
+				const path = get(playerGameState.selectionPath)
+				return path.length > 0 && path[0]?.row === props.tile.row && path[0]?.col === props.tile.col
 			})
 		)
 	)
@@ -46,8 +56,14 @@ const TileView: Component<{ readonly tile: Tile }> = (props) => {
 			aria-pressed={isTileSelected()}
 			data-tile-type={props.tile.type}
 			role="gridcell"
-			onMouseDown={() => trySelectTile(props.tile)}
+			onMouseDown={(e) => e.button !== 2 && trySelectTile(props.tile)}
 			onMouseEnter={() => isMouseDown() && trySelectTile(props.tile)}
+			onContextMenu={(e) => {
+				if (isHeadOfPath()) {
+					e.preventDefault()
+					clearSelectionPath()
+				}
+			}}
 		>
 			<span class="translate-y-[1px] drop-shadow-[0_1px_0_color-mix(in_srgb,var(--color-paper-50)_70%,transparent)]">
 				{props.tile.letter}
