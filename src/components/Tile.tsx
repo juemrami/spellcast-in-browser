@@ -24,6 +24,7 @@ const getTileStyles = (type: TileType, selected: boolean): string => {
 
 const TileView: Component<{ readonly tile: Tile }> = (props) => {
 	const trySelectTile = useAtomSet(() => playerGameState.tryUpdateSelectionPath)
+	const isMouseDown = useAtomValue(() => playerGameState.isMouseDown)
 	const isTileSelected = useAtomValue(() =>
 		pipe(
 			playerGameState.selectionPath,
@@ -45,7 +46,8 @@ const TileView: Component<{ readonly tile: Tile }> = (props) => {
 			aria-pressed={isTileSelected()}
 			data-tile-type={props.tile.type}
 			role="gridcell"
-			onClick={() => trySelectTile(props.tile)}
+			onMouseDown={() => trySelectTile(props.tile)}
+			onMouseEnter={() => isMouseDown() && trySelectTile(props.tile)}
 		>
 			<span class="translate-y-[1px] drop-shadow-[0_1px_0_color-mix(in_srgb,var(--color-paper-50)_70%,transparent)]">
 				{props.tile.letter}

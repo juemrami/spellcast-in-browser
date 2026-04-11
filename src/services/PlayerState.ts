@@ -39,10 +39,17 @@ export class PlayerGameState extends Context.Service<PlayerGameState>()("spellca
 		const clearSelectionPath = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			get.set(selectionPath, [])
 		}))
+
+		const isMouseDown = Atom.make((get) => {
+			window.addEventListener("mousedown", () => get.setSelf(true))
+			window.addEventListener("mouseup", () => get.setSelf(false))
+			return false
+		})
 		return {
 			selectionPath,
 			tryUpdateSelectionPath,
-			clearSelectionPath
+			clearSelectionPath,
+			isMouseDown
 		}
 	})
 }) {
