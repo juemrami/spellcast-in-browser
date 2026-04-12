@@ -5,6 +5,7 @@ import * as Atom from "effect/unstable/reactivity/Atom"
 
 import { pipe } from "effect/Function"
 import { type Board, BOARD_SIZE, type Tile } from "../types/game"
+import { BoardGenerator } from "./BoardGenerator"
 
 type ScoringType = "letter-points" | "word-length"
 const letterPointScores = {
@@ -53,52 +54,21 @@ const letterPointScoreLookup: Record<PointScoreSystem, Record<Letter, Score>> = 
 	Object.fromEntries
 )
 
-const boardLetters = [
-	"S",
-	"P",
-	"E",
-	"L",
-	"L",
-	"C",
-	"A",
-	"S",
-	"T",
-	"E",
-	"B",
-	"O",
-	"A",
-	"R",
-	"D",
-	"T",
-	"R",
-	"A",
-	"C",
-	"E",
-	"L",
-	"I",
-	"N",
-	"E",
-	"S"
-] as const
-
-const createInitialBoard = (): Board =>
-	boardLetters.map((letter, index) => ({
-		letter,
-		row: Math.floor(index / BOARD_SIZE),
-		col: index % BOARD_SIZE,
-		type: "normal"
-	}))
-
 export class BoardService extends Context.Service<BoardService, {
 	readonly tiles: Atom.Atom<Board>
 	readonly tileCount: Atom.Atom<number>
 	readonly getTileScore: (tile: Tile) => number
 }>()("spellcast/BoardService") {}
 
-export const make = Effect.sync(() => {
+export const make = Effect.gen(function*() {
 	const scoringType = "letter-points" as ScoringType
 	const scoringMethod: keyof typeof letterPointScores = "spellCast"
-	const tiles = Atom.make(createInitialBoard())
+	const boardGenerator = yield* BoardGenerator
+	const tiles = Atom.make(
+		yield* boardGenerator.generate(BOARD_SIZE, {
+			maxOccurrencesPerLetter: 5
+		})
+	)
 	const tileCount = Atom.make((get) => get(tiles).length)
 	const getTileScore = (tile: Tile) => {
 		if (scoringType === "word-length") {
@@ -116,3 +86,4 @@ export const make = Effect.sync(() => {
 })
 
 export const layerFresh = Layer.fresh(Layer.effect(BoardService, make))
+export const live = Layer.provide(layerFresh, BoardGenerator.live)
