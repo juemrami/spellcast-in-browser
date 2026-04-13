@@ -58,21 +58,26 @@ export class BoardService extends Context.Service<BoardService, {
 	readonly tiles: Atom.Atom<Board>
 	readonly tileCount: Atom.Atom<number>
 	readonly getTileScore: (tile: Tile) => number
+	readonly regenerateBoard: Atom.AtomResultFn<void, void>
 }>()("spellcast/BoardService") {}
 
 export const make = Effect.gen(function*() {
 	const scoringType = "letter-points" as ScoringType
 	const scoringMethod: keyof typeof letterPointScores = "spellCast"
 	const boardGenerator = yield* BoardGenerator
-	const tiles = Atom.make(
-		yield* boardGenerator.generate(BOARD_SIZE, {
-			maxOccurrencesPerLetter: 5
-		})
-	)
+	const boardOptions = {
+		maxOccurrencesPerLetter: 5
+	} as const
+	const tiles = Atom.make(yield* boardGenerator.generate(BOARD_SIZE, boardOptions))
 	const tileCount = Atom.make((get) => get(tiles).length)
+	const regenerateBoard = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
+		const nextBoard = yield* boardGenerator.generate(BOARD_SIZE, boardOptions)
+		get.set(tiles, nextBoard)
+	}))
 	const getTileScore = (tile: Tile) => {
 		if (scoringType === "word-length") {
-			console.warn("Word length scoring not implemented yet, defaulting to 1 point per tile")
+			// eslint-disable-next-line no-console
+			console.log("Word length scoring not implemented yet, defaulting to 1 point per tile")
 			return 1
 		}
 		const letterScoreLookup = letterPointScoreLookup[scoringMethod]
@@ -81,7 +86,8 @@ export const make = Effect.gen(function*() {
 	return BoardService.of({
 		tiles,
 		tileCount,
-		getTileScore
+		getTileScore,
+		regenerateBoard
 	})
 })
 
