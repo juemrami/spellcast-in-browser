@@ -8,6 +8,12 @@ const CurrentWord: Component = () => {
 	const word = useAtomValue(() => currentWordService.word)
 	const clearPlayerSelection = useAtomSet(() => playerGameState.clearSelectionPath)
 	const getCurrentWordScore = useAtomValue(() => currentWordService.currentWordScore)
+	const isCurrentWordValid = useAtomValue(() => currentWordService.isCurrentWordValid)
+	const scorePlaceholder = (
+		<span class="font-bold text-lg text-zinc-300 opacity-0">
+			0 <span class="text-xs text-zinc-300">points</span>
+		</span>
+	)
 
 	return (
 		<section class="rounded-[1.5rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 px-5 py-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-paper-50)_70%,transparent),0_8px_20px_color-mix(in_srgb,var(--color-ink)_8%,transparent)]">
@@ -30,19 +36,22 @@ const CurrentWord: Component = () => {
 				<div class="flex flex-col items-start gap-0.5">
 					<span>{word() !== "" ? word() : "Trace a word"}</span>
 					<div class="self-end px-2 text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-label-soft">
-						<span class="font-bold text-header text-lg">
-							{word() !== ""
-								? AsyncResult.match(getCurrentWordScore(), {
-									onSuccess: (pts) => (
-										<>
-											{pts.value} <span class="text-xs text-label-soft">points</span>
-										</>
-									),
-									onInitial: () => <span class="opacity-0">Points: 0</span>,
-									onFailure: () => <span class="opacity-0">Points: 0</span>
-								})
-								: <span class="opacity-0">Points: 0</span>}
-						</span>
+						{word() === ""
+							? scorePlaceholder
+							: AsyncResult.match(getCurrentWordScore(), {
+								onSuccess: (pts) =>
+									AsyncResult.match(isCurrentWordValid(), {
+										onSuccess: (r) => (
+											<span class={`font-bold text-lg ${r.value ? "text-header" : "text-zinc-300"}`}>
+												{pts.value} <span class={`text-xs ${r.value ? "text-header" : "text-zinc-300"}`}>points</span>
+											</span>
+										),
+										onFailure: () => scorePlaceholder,
+										onInitial: () => scorePlaceholder
+									}),
+								onInitial: () => scorePlaceholder,
+								onFailure: () => scorePlaceholder
+							})}
 					</div>
 				</div>
 			</div>

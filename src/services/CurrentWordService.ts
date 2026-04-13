@@ -9,8 +9,8 @@ import type { Tile } from "../types/game"
 import { BoardService } from "./BoardService"
 import { PlayerGameState } from "./PlayerState"
 
-const isValidWord = (word: string) => {
-	if (typeof word === "string" && word.length > 0) {
+const isValidWord = (word: string, wordList: Set<string>) => {
+	if (typeof word === "string" && word.length > 0 && wordList.has(word)) {
 		return true
 	}
 	return false
@@ -32,7 +32,7 @@ const getTilePathScore = (path: Array<Tile>) =>
 
 export class CurrentWordService extends Context.Service<CurrentWordService, {
 	readonly word: Atom.Atom<string>
-	readonly checkWordValidity: Atom.AtomResultFn<void, boolean>
+	readonly isCurrentWordValid: Atom.Atom<AsyncResult<boolean>>
 	readonly currentWordScore: Atom.Atom<AsyncResult<number>>
 }>()("spellcast/CurrentWordService") {}
 
@@ -51,10 +51,11 @@ export const make = Effect.gen(function*() {
 		}
 		return selectedTiles.map((tile) => tile!.letter).join("")
 	})
-	const isCurrentWordValid = Atom.fn((_: void, get) =>
+	const isCurrentWordValid = Atom.make((get) =>
 		Effect.gen(function*() {
 			const currentWordValue = get(currentWord)
-			return isValidWord(currentWordValue)
+			const solution = yield* get.result(board.boardSolutions)
+			return isValidWord(currentWordValue, solution.words)
 		})
 	)
 	const scoreCache = yield* Cache.make({
@@ -72,7 +73,7 @@ export const make = Effect.gen(function*() {
 	)
 	return CurrentWordService.of({
 		word: currentWord,
-		checkWordValidity: isCurrentWordValid,
+		isCurrentWordValid,
 		currentWordScore
 	})
 })
