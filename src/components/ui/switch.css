@@ -21,7 +21,7 @@
 		@apply shadow-switch;
 		@apply after:absolute after:left-[3px] after:top-[2.5px] after:h-[18px] after:w-[18px] after:rounded-full after:border after:border-control-border/40 after:bg-gradient-to-b after:from-control-from after:to-control-to after:transition after:duration-300;
 		@apply after:shadow-switch-thumb;
-		@apply peer-checked:border-control-border peer-checked:bg-gradient-to-b peer-checked:from-control-from peer-checked:to-control-to;
+		@apply peer-checked:border-control-border peer-checked:bg-gradient-to-b peer-checked:from-app-green-50 peer-checked:to-app-green-200;
 		@apply peer-checked:after:translate-x-[18px] peer-checked:after:border-paper-50 peer-checked:after:from-paper-50 peer-checked:after:to-paper-100;
 		@apply peer-hover:shadow-switch-hover;
 		@apply peer-hover:after:scale-95;

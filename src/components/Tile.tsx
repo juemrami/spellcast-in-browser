@@ -17,7 +17,7 @@ const baseStyles: Record<TileType, string> = {
 
 const getTileStyles = (type: TileType, selected: boolean): string => {
 	if (selected) {
-		return "bg-gradient-to-br from-purple-200 via-purple-300 to-purple-400 text-purple-900 ring-2 ring-offset-2 ring-purple-300/30 shadow-tile-selected scale-105 -translate-y-0.5"
+		return "selected-tile ring-2 ring-offset-2 scale-105 -translate-y-0.5"
 	}
 	return baseStyles[type]
 }

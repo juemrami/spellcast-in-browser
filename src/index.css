@@ -54,6 +54,14 @@
 	--color-control-from: #f8e3c6;
 	--color-control-to: #e9c69a;
 	--color-control-text: #4d3524;
+	--color-app-green-50: #e6e7dd;
+	--color-app-green-200: #AAB08C;
+}
+
+@utility selected-tile {
+	@apply bg-gradient-to-br from-purple-200 via-purple-300 to-purple-400;
+	@apply text-purple-900 ring-purple-300/30;
+	@apply shadow-tile-selected;
 }
 
 @utility shadow-panel {
