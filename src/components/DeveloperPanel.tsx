@@ -15,7 +15,7 @@ const DeveloperPanel: Component = () => {
 	return (
 		<aside
 			id="developer-panel"
-			class="w-full max-w-[14rem] max-h-[calc(100vh-5rem)] overflow-auto rounded-xl border border-shell bg-paper-50/90 p-3 shadow-[0_12px_28px_color-mix(in_srgb,var(--color-ink)_10%,transparent)] backdrop-blur"
+			class="w-full max-w-[14rem] max-h-[calc(100vh-5rem)] overflow-auto rounded-xl border border-shell bg-paper-50/90 p-3 shadow-panel backdrop-blur"
 		>
 			<div class="flex items-center justify-between gap-3">
 				<p class="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-label-soft">

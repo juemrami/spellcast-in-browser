@@ -26,7 +26,7 @@ const GameLayout: Component = () => {
 					onClick={() => {
 						setDeveloperPanelOpen((open) => !open)
 					}}
-					class="inline-flex items-center gap-2 rounded-full border border-shell bg-paper-50/90 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge shadow-[0_8px_20px_color-mix(in_srgb,var(--color-ink)_12%,transparent)] backdrop-blur transition hover:-translate-y-0.5"
+					class="inline-flex items-center gap-2 rounded-full border border-shell bg-paper-50/90 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge shadow-pill backdrop-blur transition hover:-translate-y-0.5"
 				>
 					<span class="h-2 w-2 rounded-full bg-glow-mint" />
 					{isDeveloperPanelOpen() ? "Hide dev panel" : "Show dev panel"}
@@ -38,7 +38,7 @@ const GameLayout: Component = () => {
 					<p class="text-3xl font-semibold uppercase tracking-[0.55em] text-label">
 						BoggleCast
 					</p>
-					<div class="inline-flex items-center gap-2 rounded-full border border-shell bg-paper-50/82 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge shadow-[0_8px_18px_color-mix(in_srgb,var(--color-ink)_8%,transparent)] backdrop-blur">
+					<div class="inline-flex items-center gap-2 rounded-full border border-shell bg-paper-50/82 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge shadow-pill backdrop-blur">
 						<span>{tileCount()}</span>
 						<span class="text-label-muted">letters</span>
 						<span class="text-label-faint">•</span>
@@ -46,7 +46,7 @@ const GameLayout: Component = () => {
 					</div>
 				</header>
 
-				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-4 shadow-[0_28px_80px_color-mix(in_srgb,var(--color-ink)_14%,transparent)] sm:p-6">
+				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-4 shadow-panel-hero sm:p-6">
 					<div class="mb-2 flex w-full items-center justify-end gap-3 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge">
 						<span class="text-label-muted">auto-submit</span>
 						<Switch ariaLabel="Auto-submit" class="shrink-0" onChange={(value) => {}} />

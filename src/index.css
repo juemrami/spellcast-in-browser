@@ -56,6 +56,54 @@
 	--color-control-text: #4d3524;
 }
 
+@utility shadow-panel {
+	box-shadow: 0 12px 28px color-mix(in srgb, var(--color-ink) 10%, transparent);
+}
+
+@utility shadow-panel-hero {
+	box-shadow: 0 28px 80px color-mix(in srgb, var(--color-ink) 14%, transparent);
+}
+
+@utility shadow-pill {
+	box-shadow: 0 8px 18px color-mix(in srgb, var(--color-ink) 10%, transparent);
+}
+
+@utility shadow-button {
+	box-shadow:
+		0 8px 0 color-mix(in srgb, var(--color-ink) 14%, transparent),
+		0 18px 30px color-mix(in srgb, var(--color-ink) 12%, transparent);
+}
+
+@utility shadow-card {
+	box-shadow:
+		inset 0 1px 0 color-mix(in srgb, var(--color-paper-50) 70%, transparent),
+		0 8px 20px color-mix(in srgb, var(--color-ink) 8%, transparent);
+}
+
+@utility shadow-tile {
+	box-shadow:
+		0 2px 0 color-mix(in srgb, var(--color-ink) 8%, transparent),
+		0 12px 26px color-mix(in srgb, var(--color-ink) 10%, transparent);
+}
+
+@utility shadow-tile-hover {
+	box-shadow:
+		0 4px 0 color-mix(in srgb, var(--color-ink) 8%, transparent),
+		0 16px 32px color-mix(in srgb, var(--color-ink) 14%, transparent);
+}
+
+@utility shadow-tile-selected {
+	box-shadow: 0 8px 0 rgba(124, 58, 237, 0.12);
+}
+
+@utility shadow-chip {
+	box-shadow: 0 1px 0 color-mix(in srgb, var(--color-ink) 10%, transparent);
+}
+
+@utility drop-shadow-frost {
+	filter: drop-shadow(0 1px 0 color-mix(in srgb, var(--color-paper-50) 70%, transparent));
+}
+
 :root {
 	color-scheme: light;
 }
