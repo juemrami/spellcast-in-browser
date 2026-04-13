@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from "effect"
+import { Cache, Context, Effect, Layer } from "effect"
 import type { Board, Path, Tile } from "../types/game"
 import { type TrieNode, UnigramTrie } from "./Trie"
 import { WordList } from "./WordList"
@@ -48,17 +48,26 @@ export class BoggleSolver extends Context.Service<BoggleSolver>()(
 		make: Effect.gen(function*() {
 			const wordList = yield* WordList
 			const trie = yield* UnigramTrie.make(wordList)
+			const solutionCache = yield* Cache.make<string, BoggleSolutions>({
+				capacity: 10_000,
+				lookup: (key: string) =>
+					Effect.sync(() => {
+						const board: Board = JSON.parse(key)
+						const results: Array<Path> = []
+						const visited = new Map<string, boolean>()
+						for (const tile of board) {
+							dfs(board, tile, trie.root, [], visited, results)
+						}
+						return {
+							paths: results,
+							words: new Set(results.map((path) => path.map((tile) => tile.letter).join("")))
+						} as BoggleSolutions
+					})
+			})
 			return {
 				solve: Effect.fn(function*(board: Board) {
-					const results: Array<Path> = []
-					const visited = new Map<string, boolean>()
-					for (const tile of board) {
-						dfs(board, tile, trie.root, [], visited, results)
-					}
-					return {
-						paths: results,
-						words: new Set(results.map((path) => path.map((tile) => tile.letter).join("")))
-					} as BoggleSolutions
+					const key = JSON.stringify(board)
+					return yield* Cache.get(solutionCache, key)
 				}),
 				analyzeSolution: Effect.fn(function*(solution: BoggleSolutions) {
 					const avgWordLength = [...solution.words].reduce((sum, word) => sum + word.length, 0) / solution.words.size
