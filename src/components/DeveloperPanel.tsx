@@ -1,11 +1,13 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, For } from "solid-js"
-import { boardService, playerGameState } from "../services/layers"
+import { boardService, gameState, playerGameState } from "../services/layers"
 
 const DeveloperPanel: Component = () => {
 	const regenerateBoard = useAtomSet(() => boardService.regenerateBoard)
+	const resetMatch = useAtomSet(() => gameState.state)
 	const clearSelectionPath = useAtomSet(() => playerGameState.clearSelectionPath)
+	const matchState = useAtomValue(() => gameState.state)
 	const solutions = useAtomValue(() => boardService.boardSolutions)
 
 	const handleRegenerate = () => {
@@ -21,6 +23,29 @@ const DeveloperPanel: Component = () => {
 				<p class="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-label-soft">
 					Developer Panel
 				</p>
+			</div>
+			<div class="mt-3 rounded-lg border border-shell bg-paper-100/80 px-3 py-2 text-[0.72rem] leading-5 text-ink">
+				<div class="flex items-center justify-between gap-3">
+					<span class="uppercase tracking-[0.2em] text-label-soft">Match phase</span>
+					<span class="font-semibold">{matchState().phase}</span>
+				</div>
+				<div class="mt-1 flex items-center justify-between gap-3 text-label-muted">
+					<span>Players</span>
+					<span>{matchState().players.length}</span>
+				</div>
+				<div class="flex items-center justify-between gap-3 text-label-muted">
+					<span>Rounds</span>
+					<span>{matchState().rounds.length}</span>
+				</div>
+				<button
+					type="button"
+					onClick={() => {
+						resetMatch({ type: "resetMatch" })
+					}}
+					class="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-shell bg-paper-50 px-3 py-1.5 text-xs font-semibold tracking-[0.12em] text-ink transition hover:bg-paper-200 active:bg-paper-200"
+				>
+					Reset match state
+				</button>
 			</div>
 
 			<button
