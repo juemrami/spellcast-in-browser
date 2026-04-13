@@ -6,6 +6,7 @@ import Board from "./Board"
 import CurrentWord from "./CurrentWord"
 import DeveloperPanel from "./DeveloperPanel"
 import SubmitButton from "./SubmitButton"
+import { Switch } from "./ui/switch"
 
 const GameLayout: Component = () => {
 	const tileCount = useAtomValue(() => boardService.tileCount)
@@ -46,6 +47,10 @@ const GameLayout: Component = () => {
 				</header>
 
 				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-4 shadow-[0_28px_80px_color-mix(in_srgb,var(--color-ink)_14%,transparent)] sm:p-6">
+					<div class="mb-2 flex w-full items-center justify-end gap-3 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge">
+						<span class="text-label-muted">auto-submit</span>
+						<Switch ariaLabel="Auto-submit" class="shrink-0" onChange={(value) => {}} />
+					</div>
 					<CurrentWord />
 					<div class="mt-4">
 						<Board />

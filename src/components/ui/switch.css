@@ -1,0 +1,14 @@
+@reference "../../index.css";
+@layer components {
+	.base-switch {
+		@apply relative h-[24px] w-[44px] rounded-full border border-shell bg-gradient-to-b from-paper-50 to-paper-100 transition duration-300;
+		@apply shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-paper-50)_72%,transparent),0_6px_14px_color-mix(in_srgb,var(--color-ink)_10%,transparent)];
+		@apply after:absolute after:left-[3px] after:top-[2.5px] after:h-[18px] after:w-[18px] after:rounded-full after:border after:border-control-border/40 after:bg-gradient-to-b after:from-control-from after:to-control-to after:transition after:duration-300;
+		@apply after:shadow-[0_4px_10px_color-mix(in_srgb,var(--color-ink)_12%,transparent)];
+		@apply peer-checked:border-control-border peer-checked:bg-gradient-to-b peer-checked:from-control-from peer-checked:to-control-to;
+		@apply peer-checked:after:translate-x-[18px] peer-checked:after:border-paper-50 peer-checked:after:from-paper-50 peer-checked:after:to-paper-100;
+		@apply peer-hover:shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-paper-50)_72%,transparent),0_8px_18px_color-mix(in_srgb,var(--color-ink)_12%,transparent)];
+		@apply peer-hover:after:scale-95;
+		@apply peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-control-border/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-paper-50;
+	}
+}
