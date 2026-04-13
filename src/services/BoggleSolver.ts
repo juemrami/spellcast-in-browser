@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect"
-import type { Board, Tile } from "../types/game"
+import type { Board, Path, Tile } from "../types/game"
 import { type TrieNode, UnigramTrie } from "./Trie"
 import { WordList } from "./WordList"
 
@@ -38,6 +38,10 @@ const dfs = (
 	}
 	visited.set(`${tile.row},${tile.col}`, false) // backtrack -- same tile can be used in different paths
 }
+type BoggleSolutions = {
+	paths: Array<Path>
+	words: Set<string>
+}
 export class BoggleSolver extends Context.Service<BoggleSolver>()(
 	"BoggleSolver",
 	{
@@ -46,7 +50,6 @@ export class BoggleSolver extends Context.Service<BoggleSolver>()(
 			const trie = yield* UnigramTrie.make(wordList)
 			return {
 				solve: Effect.fn(function*(board: Board) {
-					type Path = Array<Tile>
 					const results: Array<Path> = []
 					const visited = new Map<string, boolean>()
 					for (const tile of board) {
@@ -55,6 +58,19 @@ export class BoggleSolver extends Context.Service<BoggleSolver>()(
 					return {
 						paths: results,
 						words: new Set(results.map((path) => path.map((tile) => tile.letter).join("")))
+					} as BoggleSolutions
+				}),
+				analyzeSolution: Effect.fn(function*(solution: BoggleSolutions) {
+					const avgWordLength = [...solution.words].reduce((sum, word) => sum + word.length, 0) / solution.words.size
+					const longestWord = [...solution.words].reduce(
+						(longest, word) => word.length > longest.length ? word : longest,
+						""
+					)
+					const totalWords = solution.words.size
+					return {
+						avgWordLength,
+						longestWord,
+						totalWords
 					}
 				})
 			}

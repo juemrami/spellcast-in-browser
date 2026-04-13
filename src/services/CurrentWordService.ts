@@ -41,7 +41,7 @@ export const make = Effect.gen(function*() {
 	const player = yield* PlayerGameState
 
 	const currentWord = Atom.make((ctx) => {
-		const tiles = ctx.get(board.tiles)
+		const tiles = ctx.get(board.boardTiles)
 		const playerSelectionPath = ctx.get(player.selectionPath)
 		const selectedTiles = playerSelectionPath.map((selected) =>
 			tiles.find((tile) => tile.row === selected.row && tile.col === selected.col)

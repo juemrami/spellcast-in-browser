@@ -8,5 +8,6 @@ export interface Tile {
 }
 
 export type Board = ReadonlyArray<Tile>
+export type Path = Array<Tile>
 
 export const BOARD_SIZE = 5

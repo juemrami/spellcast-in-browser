@@ -1,28 +1,17 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-solid"
-import { AsyncResult, Atom } from "effect/unstable/reactivity"
+import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, For } from "solid-js"
-
-import { Effect, pipe } from "effect"
 import { boardService, playerGameState } from "../services/layers"
-
-const solveBoardAtom = pipe(
-	Atom.make(Effect.fn(function*(ctx) {
-		const board = ctx.get(boardService.tiles)
-		return yield* boardService.solver.solve(board)
-	})),
-	Atom.keepAlive
-)
 
 const DeveloperPanel: Component = () => {
 	const regenerateBoard = useAtomSet(() => boardService.regenerateBoard)
 	const clearSelectionPath = useAtomSet(() => playerGameState.clearSelectionPath)
-	const solutions = useAtomValue(() => solveBoardAtom)
+	const solutions = useAtomValue(() => boardService.boardSolutions)
 
 	const handleRegenerate = () => {
 		clearSelectionPath()
 		regenerateBoard()
 	}
-
 	return (
 		<aside
 			id="developer-panel"
