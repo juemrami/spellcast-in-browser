@@ -38,7 +38,9 @@ export class WordList extends Context.Service<WordList>()(
 			const httpClient = yield* HttpClient.HttpClient
 			const response = yield* httpClient.get(wordListUrl)
 			const wordListTxt = yield* response.text
-			const wordList = wordListTxt.split("\n").map((word) => word.trim()).filter((word) => word.length > 0)
+			const wordList = wordListTxt.split("\n").map((word) => word.trim()).filter((word) => word.length > 0).map((w) =>
+				w.replace(/[^a-zA-Z]/g, "")
+			)
 			return wordList
 		})
 	}

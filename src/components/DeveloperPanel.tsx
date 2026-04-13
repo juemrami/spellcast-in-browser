@@ -1,11 +1,22 @@
-import { useAtomSet } from "@effect/atom-solid"
-import type { Component } from "solid-js"
+import { useAtomSet, useAtomValue } from "@effect/atom-solid"
+import { AsyncResult, Atom } from "effect/unstable/reactivity"
+import { type Component, For } from "solid-js"
 
+import { Effect, pipe } from "effect"
 import { boardService, playerGameState } from "../services/layers"
+
+const solveBoardAtom = pipe(
+	Atom.make(Effect.fn(function*(ctx) {
+		const board = ctx.get(boardService.tiles)
+		return yield* boardService.solver.solve(board)
+	})),
+	Atom.keepAlive
+)
 
 const DeveloperPanel: Component = () => {
 	const regenerateBoard = useAtomSet(() => boardService.regenerateBoard)
 	const clearSelectionPath = useAtomSet(() => playerGameState.clearSelectionPath)
+	const solutions = useAtomValue(() => solveBoardAtom)
 
 	const handleRegenerate = () => {
 		clearSelectionPath()
@@ -30,6 +41,37 @@ const DeveloperPanel: Component = () => {
 			>
 				Regenerate board
 			</button>
+
+			<div class="mt-3 rounded-lg border border-shell bg-paper-100/80 px-3 py-2">
+				{AsyncResult.match(solutions(), {
+					onSuccess: (solution) => {
+						const words = [...solution.value.words].sort((firstWord, secondWord) => firstWord.localeCompare(secondWord))
+						return (
+							<div class="space-y-2">
+								<div class="flex items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.2em] text-label-soft">
+									<span>Solver words</span>
+									<span class="text-ink">{words.length}</span>
+								</div>
+								{words.length > 0
+									? (
+										<ul class="max-h-40 space-y-1 overflow-auto text-[0.72rem] leading-5 text-ink">
+											<For each={words}>
+												{(word) => (
+													<li class="rounded-md bg-paper-50 px-2 py-1 font-medium tracking-[0.08em]">
+														{word}
+													</li>
+												)}
+											</For>
+										</ul>
+									)
+									: <p class="text-[0.72rem] leading-5 text-label-muted">No words found.</p>}
+							</div>
+						)
+					},
+					onInitial: () => <p class="text-[0.72rem] leading-5 text-label-muted">Solving board...</p>,
+					onFailure: () => <p class="text-[0.72rem] leading-5 text-label-muted">Solver unavailable.</p>
+				})}
+			</div>
 		</aside>
 	)
 }

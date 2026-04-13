@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer"
 import { pipe } from "effect/Function"
 import { FetchHttpClient } from "effect/unstable/http"
 import * as BoardService from "./BoardService"
+import { BoggleSolver } from "./BoggleSolver"
 import { currentWordLayer, CurrentWordService } from "./CurrentWordService"
 import { PlayerGameState } from "./PlayerState"
 import { WordList } from "./WordList"
@@ -12,8 +13,11 @@ import { WordList } from "./WordList"
 export const gameLayer = pipe(
 	Layer.provideMerge(
 		currentWordLayer,
-		Layer.merge(
-			Layer.provideMerge(BoardService.live, Layer.provide(WordList.layerWordnik, FetchHttpClient.layer)),
+		Layer.mergeAll(
+			Layer.provideMerge(
+				Layer.provide(BoardService.live, BoggleSolver.layer),
+				Layer.provide(WordList.layerWordnik, FetchHttpClient.layer)
+			),
 			PlayerGameState.layerFresh
 		)
 	)

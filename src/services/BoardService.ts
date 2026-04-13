@@ -6,6 +6,7 @@ import * as Atom from "effect/unstable/reactivity/Atom"
 import { pipe } from "effect/Function"
 import { type Board, BOARD_SIZE, type Tile } from "../types/game"
 import { BoardGenerator } from "./BoardGenerator"
+import { BoggleSolver } from "./BoggleSolver"
 
 type ScoringType = "letter-points" | "word-length"
 const letterPointScores = {
@@ -59,6 +60,7 @@ export class BoardService extends Context.Service<BoardService, {
 	readonly tileCount: Atom.Atom<number>
 	readonly getTileScore: (tile: Tile) => number
 	readonly regenerateBoard: Atom.AtomResultFn<void, void>
+	readonly solver: typeof BoggleSolver.Service
 }>()("spellcast/BoardService") {}
 
 export const make = Effect.gen(function*() {
@@ -87,7 +89,8 @@ export const make = Effect.gen(function*() {
 		tiles,
 		tileCount,
 		getTileScore,
-		regenerateBoard
+		regenerateBoard,
+		solver: yield* BoggleSolver
 	})
 })
 
