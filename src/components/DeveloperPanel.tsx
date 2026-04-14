@@ -1,12 +1,12 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, For } from "solid-js"
-import { boardService, gameState, playerGameState } from "../services/layers"
+import { boardService, gameState, playerState } from "../services/layers"
 
 const DeveloperPanel: Component = () => {
 	const regenerateBoard = useAtomSet(() => boardService.regenerateBoard)
 	const resetMatch = useAtomSet(() => gameState.state)
-	const clearSelectionPath = useAtomSet(() => playerGameState.clearSelectionPath)
+	const clearSelectionPath = useAtomSet(() => playerState.clearSelectionPath)
 	const matchState = useAtomValue(() => gameState.state)
 	const solutions = useAtomValue(() => boardService.boardSolutions)
 

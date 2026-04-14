@@ -3,7 +3,7 @@ import type { Component } from "solid-js"
 import { useAtomSet, useAtomValue } from "@effect/atom-solid/Hooks"
 import { pipe } from "effect"
 import { Atom } from "effect/unstable/reactivity"
-import { boardService, playerGameState } from "../services/layers"
+import { boardService, playerState } from "../services/layers"
 import type { Tile, TileType } from "../types/game"
 
 const baseStyles: Record<TileType, string> = {
@@ -27,31 +27,31 @@ const getScoreChipStyles = (score: number): string => {
 }
 
 const TileView: Component<{ readonly tile: Tile }> = (props) => {
-	const trySelectTile = useAtomSet(() => playerGameState.tryUpdateSelectionPath)
-	const clearSelectionPath = useAtomSet(() => playerGameState.clearSelectionPath)
-	const isMouseDown = useAtomValue(() => playerGameState.isMouseDown)
+	const trySelectTile = useAtomSet(() => playerState.tryUpdateSelectionPath)
+	const clearSelectionPath = useAtomSet(() => playerState.clearSelectionPath)
+	const isMouseDown = useAtomValue(() => playerState.isMouseDown)
 	const tileScore = boardService.getTileScore(props.tile)
 	const isTileSelected = useAtomValue(() =>
 		pipe(
-			playerGameState.selectionPath,
+			playerState.selectionPath,
 			Atom.transform((get) => {
-				const path = get(playerGameState.selectionPath)
+				const path = get(playerState.selectionPath)
 				return path.some((t) => t.row === props.tile.row && t.col === props.tile.col)
 			})
 		)
 	)
 	const isHeadOfPath = useAtomValue(() =>
 		pipe(
-			playerGameState.selectionPath,
+			playerState.selectionPath,
 			Atom.transform((get) => {
-				const path = get(playerGameState.selectionPath)
+				const path = get(playerState.selectionPath)
 				return path.length > 0 && path[0]?.row === props.tile.row && path[0]?.col === props.tile.col
 			})
 		)
 	)
 	const debouncedTileSelect = useAtomSet(() =>
 		pipe(
-			playerGameState.tryUpdateSelectionPath,
+			playerState.tryUpdateSelectionPath,
 			Atom.debounce("20 millis")
 		)
 	)

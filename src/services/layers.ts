@@ -8,7 +8,7 @@ import * as BoardService from "./BoardService"
 import { BoggleSolver } from "./BoggleSolver"
 import { currentWordLayer, CurrentWordService } from "./CurrentWordService"
 import * as GameState from "./GameState"
-import { PlayerGameState } from "./PlayerState"
+import { ClientPlayerState } from "./PlayerState"
 import { WordList } from "./WordList"
 
 export const gameLayer = pipe(
@@ -19,8 +19,10 @@ export const gameLayer = pipe(
 				Layer.provide(BoardService.live, BoggleSolver.layer),
 				Layer.provide(WordList.layerWordnik, FetchHttpClient.layer)
 			),
-			PlayerGameState.layerFresh,
-			GameState.layerFresh
+			Layer.provideMerge(
+				ClientPlayerState.layerFresh,
+				GameState.layerFresh
+			)
 		)
 	)
 )
@@ -29,5 +31,5 @@ const gameContext = await Effect.runPromise(Effect.scoped(Layer.build(gameLayer)
 
 export const boardService = Context.get(gameContext, BoardService.BoardService)
 export const currentWordService = Context.get(gameContext, CurrentWordService)
-export const playerGameState = Context.get(gameContext, PlayerGameState)
+export const playerState = Context.get(gameContext, ClientPlayerState)
 export const gameState = Context.get(gameContext, GameState.GameState)

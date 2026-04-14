@@ -2,15 +2,17 @@ import { Effect, Layer } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
+import * as GameState from "./GameState"
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	const rowDiff = Math.abs(tileA.row - tileB.row)
 	const colDiff = Math.abs(tileA.col - tileB.col)
 	return rowDiff <= 1 && colDiff <= 1
 }
-export class PlayerGameState extends Context.Service<PlayerGameState>()("spellcast/PlayerGameState", {
+export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app/PlayerClientState", {
 	make: Effect.gen(function*() {
 		const selectionPath = Atom.make([] as Array<Tile>)
+		const { state: currentGame } = yield* GameState.GameState
 		const tryUpdateSelectionPath = Atom.fn(Effect.fn(function*(tile: Tile, get: Atom.FnContext) {
 			const path = get(selectionPath)
 			const tail = path.at(-1)
@@ -46,10 +48,27 @@ export class PlayerGameState extends Context.Service<PlayerGameState>()("spellca
 			return false
 		})
 		type PlayerMeta = { id: string; name: string }
+		const upsertDefaultPlayerMeta = () => {
+			const defaultMeta = {
+				id: crypto.randomUUID(),
+				name: `Player-${Math.floor(Math.random() * 1000)}`
+			}
+			localStorage.setItem("playerMeta", JSON.stringify(defaultMeta))
+			return defaultMeta
+		}
 		const playerMeta = Atom.writable((ctx) => {
 			const getStored = () => {
 				const storedMeta = localStorage.getItem("playerMeta")
-				return storedMeta ? JSON.parse(storedMeta) as PlayerMeta : undefined
+				if (!storedMeta) return upsertDefaultPlayerMeta()
+				try {
+					const parsed = JSON.parse(storedMeta) as PlayerMeta
+					if (typeof parsed.id === "string" && typeof parsed.name === "string") {
+						return parsed
+					}
+					return upsertDefaultPlayerMeta()
+				} catch {
+					return upsertDefaultPlayerMeta()
+				}
 			}
 			const eventListener = () => ctx.setSelf(getStored())
 			window.addEventListener("storage", eventListener)
@@ -59,12 +78,39 @@ export class PlayerGameState extends Context.Service<PlayerGameState>()("spellca
 			localStorage.setItem("playerMeta", JSON.stringify(meta))
 			ctx.setSelf(meta)
 		})
+		const playerName = Atom.writable((get) => {
+			const meta = get(playerMeta)
+			return meta.name
+		}, (ctx, name: string) => {
+			const trimmedName = name.trim()
+			if (trimmedName.length === 0) {
+				return
+			}
+			const meta = { ...ctx.get(playerMeta), name: trimmedName }
+			ctx.set(playerMeta, meta)
+			ctx.setSelf(trimmedName)
+		})
+		const joinCurrentGameLobby = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
+			let meta = get(playerMeta)
+			const trimmedName = meta.name.trim()
+			if (trimmedName.length === 0) {
+				const newName = `Player-${Math.floor(Math.random() * 1000)}`
+				meta = { ...meta, name: newName }
+				get.set(playerMeta, meta)
+			}
+			get.set(currentGame, { type: "joinLobby", player: meta })
+		}))
+		const playerId = Atom.readable((get) => get(playerMeta).id)
 		return {
 			selectionPath,
 			tryUpdateSelectionPath,
 			clearSelectionPath,
 			isMouseDown,
-			playerMeta
+			meta: {
+				playerName,
+				playerId
+			},
+			joinCurrentGameLobby
 		}
 	})
 }) {

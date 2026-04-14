@@ -7,7 +7,7 @@ import type { AsyncResult } from "effect/unstable/reactivity/AsyncResult"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
 import { BoardService } from "./BoardService"
-import { PlayerGameState } from "./PlayerState"
+import { ClientPlayerState } from "./PlayerState"
 
 const isValidWord = (word: string, wordList: Set<string>) => {
 	if (typeof word === "string" && word.length > 0 && wordList.has(word)) {
@@ -38,7 +38,7 @@ export class CurrentWordService extends Context.Service<CurrentWordService, {
 
 export const make = Effect.gen(function*() {
 	const board = yield* BoardService
-	const player = yield* PlayerGameState
+	const player = yield* ClientPlayerState
 
 	const currentWord = Atom.make((ctx) => {
 		const tiles = ctx.get(board.boardTiles)

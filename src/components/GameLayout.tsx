@@ -1,9 +1,9 @@
-import { useAtom, useAtomValue } from "@effect/atom-solid"
+import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { type Component, createSignal, Show } from "solid-js"
 
 import { Match } from "effect"
 import { MIN_PLAYERS } from "../services/GameState"
-import { boardService, gameState, playerGameState } from "../services/layers"
+import { boardService, gameState, playerState } from "../services/layers"
 import Board from "./Board"
 import CurrentWord from "./CurrentWord"
 import DeveloperPanel from "./DeveloperPanel"
@@ -13,9 +13,10 @@ import { Switch as UiSwitch } from "./ui/switch"
 const GameLayout: Component = () => {
 	const tileCount = useAtomValue(() => boardService.tileCount)
 	const [isDeveloperPanelOpen, setDeveloperPanelOpen] = createSignal(false)
-	const [playerMeta, setPlayerMeta] = useAtom(() => playerGameState.playerMeta)
 	const [gamestate, setGamestate] = useAtom(() => gameState.state)
-	const [playerName, setPlayerName] = createSignal(playerMeta()?.name ?? "")
+	const joinLobby = useAtomSet(() => playerState.joinCurrentGameLobby)
+	const [playerName, setPlayerName] = useAtom(() => playerState.meta.playerName)
+	const playerId = useAtomValue(() => playerState.meta.playerId)
 
 	return (
 		<main class="relative min-h-screen overflow-hidden px-4 py-8 text-ink sm:px-6 lg:px-8">
@@ -59,17 +60,9 @@ const GameLayout: Component = () => {
 									event.preventDefault()
 									const trimmedName = playerName().trim()
 									if (trimmedName.length === 0) {
-										return
+										setPlayerName(`Player-${Math.floor(Math.random() * 1000)}`)
 									}
-									const player = {
-										id: playerMeta()?.id ?? crypto.randomUUID(),
-										name: trimmedName
-									}
-									setPlayerMeta(player)
-									setGamestate({
-										type: "joinLobby",
-										player
-									})
+									joinLobby()
 								}}
 							>
 								<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-label">
@@ -88,7 +81,7 @@ const GameLayout: Component = () => {
 														<span class="font-semibold tracking-[0.1em] text-header">
 															{player.name}
 														</span>
-														{playerMeta()?.id === player.id
+														{playerId() === player.id
 															? (
 																<span class="text-[0.72rem] font-medium tracking-[0.08em] text-label-muted">
 																	(you)
