@@ -3,6 +3,8 @@ import * as Layer from "effect/Layer"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Path } from "../types/game"
 
+export const MIN_PLAYERS = 1
+
 export type GamePhase = "lobby" | "in-round" | "between-rounds"
 export type RoundStatus = "active" | "ended"
 export type RoundEndReason = "timer" | "manual" | "board-exhausted"
@@ -284,10 +286,9 @@ export const reduceGameState = (
 			}
 		}
 		case "startMatch": {
-			if (state.phase !== "lobby" || state.players.length === 0 || state.players.some((player) => !player.ready)) {
+			if (state.phase !== "lobby" || state.players.length < MIN_PLAYERS) {
 				return state
 			}
-
 			const round = createRound(state, action.round)
 			if (round === null) {
 				return state

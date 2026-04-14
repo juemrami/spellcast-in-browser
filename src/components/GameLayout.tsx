@@ -2,6 +2,7 @@ import { useAtom, useAtomValue } from "@effect/atom-solid"
 import { type Component, createSignal, Show } from "solid-js"
 
 import { Match } from "effect"
+import { MIN_PLAYERS } from "../services/GameState"
 import { boardService, gameState, playerGameState } from "../services/layers"
 import Board from "./Board"
 import CurrentWord from "./CurrentWord"
@@ -134,6 +135,34 @@ const GameLayout: Component = () => {
 									>
 										Join lobby
 									</button>
+								</div>
+								<div class="flex w-full flex-col items-stretch gap-2">
+									<button
+										type="button"
+										onClick={() => {
+											if (state.players.length < MIN_PLAYERS) {
+												return
+											}
+
+											setGamestate({
+												type: "startMatch",
+												matchId: crypto.randomUUID(),
+												round: {
+													startedAt: Date.now(),
+													durationMs: 120000,
+													turnOrder: state.players.map((player) => player.id),
+													boardSeed: crypto.randomUUID()
+												}
+											})
+										}}
+										disabled={state.players.length < MIN_PLAYERS}
+										class="inline-flex w-full items-center justify-center rounded-full border border-control-border bg-gradient-to-b from-control-from to-control-to px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-control-text shadow-button transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:brightness-100 sm:w-auto sm:min-w-36"
+									>
+										Start game
+									</button>
+									<p class="text-center text-[0.72rem] font-medium tracking-[0.08em] text-label-muted">
+										Add at least {MIN_PLAYERS} players to begin.
+									</p>
 								</div>
 							</form>
 						)),
