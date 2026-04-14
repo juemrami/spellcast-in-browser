@@ -45,11 +45,26 @@ export class PlayerGameState extends Context.Service<PlayerGameState>()("spellca
 			window.addEventListener("mouseup", () => get.setSelf(false))
 			return false
 		})
+		type PlayerMeta = { id: string; name: string }
+		const playerMeta = Atom.writable((ctx) => {
+			const getStored = () => {
+				const storedMeta = localStorage.getItem("playerMeta")
+				return storedMeta ? JSON.parse(storedMeta) as PlayerMeta : undefined
+			}
+			const eventListener = () => ctx.setSelf(getStored())
+			window.addEventListener("storage", eventListener)
+			ctx.addFinalizer(() => window.removeEventListener("storage", eventListener))
+			return getStored()
+		}, (ctx, meta: PlayerMeta) => {
+			localStorage.setItem("playerMeta", JSON.stringify(meta))
+			ctx.setSelf(meta)
+		})
 		return {
 			selectionPath,
 			tryUpdateSelectionPath,
 			clearSelectionPath,
-			isMouseDown
+			isMouseDown,
+			playerMeta
 		}
 	})
 }) {

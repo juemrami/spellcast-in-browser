@@ -69,7 +69,6 @@ export type GameStateAction =
 			readonly id: string
 			readonly name: string
 		}
-		joinedAt?: number
 		ready?: boolean
 	}
 	| {
@@ -246,12 +245,13 @@ export const reduceGameState = (
 				return state
 			}
 
+			const joinedAt = Date.now()
 			const nextPlayer: LobbyPlayer = {
 				id: action.player.id,
 				name: action.player.name,
 				ready: action.ready ?? false,
 				score: 0,
-				joinedAt: action.joinedAt ?? null
+				joinedAt
 			}
 
 			return {
