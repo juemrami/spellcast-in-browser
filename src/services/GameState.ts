@@ -1,4 +1,4 @@
-import { Context, Effect } from "effect"
+import { Context, type Data, Effect, Match } from "effect"
 import * as Layer from "effect/Layer"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Path } from "../types/game"
@@ -63,36 +63,29 @@ export interface GameStateSnapshot {
 export interface GameStateService {
 	readonly state: Atom.Writable<GameStateSnapshot, GameStateAction>
 }
-
-export type GameStateAction =
-	| {
-		type: "joinLobby"
+export type GameStateAction = Data.TaggedEnum<{
+	joinLobby: {
 		player: {
 			readonly id: string
 			readonly name: string
 		}
 		ready?: boolean
 	}
-	| {
-		type: "leaveLobby"
+	leaveLobby: {
 		playerId: string
 	}
-	| {
-		type: "setReady"
+	setReady: {
 		playerId: string
 		ready: boolean
 	}
-	| {
-		type: "startMatch"
+	startMatch: {
 		matchId: string
 		round: RoundStartInput
 	}
-	| {
-		type: "startRound"
+	startRound: {
 		round: RoundStartInput
 	}
-	| {
-		type: "submitWord"
+	submitWord: {
 		roundId: number
 		playerId: string
 		word: string
@@ -100,21 +93,18 @@ export type GameStateAction =
 		points: number
 		submittedAt: number
 	}
-	| {
-		type: "advanceTurn"
+	advanceTurn: {
 		roundId: number
 		reason: AdvanceTurnReason
 		nextPlayerId?: string
 	}
-	| {
-		type: "endRound"
+	endRound: {
 		roundId: number
 		reason: RoundEndReason
 		endedAt: number
 	}
-	| {
-		type: "resetMatch"
-	}
+	resetMatch: {}
+}>
 
 const createInitialGameState = (): GameStateSnapshot => ({
 	matchId: null,
@@ -241,199 +231,198 @@ export const reduceGameState = (
 	state: GameStateSnapshot,
 	action: GameStateAction
 ): GameStateSnapshot => {
-	switch (action.type) {
-		case "joinLobby": {
-			if (state.phase !== "lobby") {
-				return state
-			}
-
-			const joinedAt = Date.now()
-			const nextPlayer: LobbyPlayer = {
-				id: action.player.id,
-				name: action.player.name,
-				ready: action.ready ?? false,
-				score: 0,
-				joinedAt
-			}
-
-			return {
-				...state,
-				players: upsertPlayer(state.players, nextPlayer)
-			}
-		}
-		case "leaveLobby": {
-			if (state.phase !== "lobby") {
-				return state
-			}
-
-			return {
-				...state,
-				players: state.players.filter((player) => player.id !== action.playerId)
-			}
-		}
-		case "setReady": {
-			if (state.phase !== "lobby") {
-				return state
-			}
-
-			return {
-				...state,
-				players: state.players.map((player) =>
-					player.id === action.playerId
-						? { ...player, ready: action.ready }
-						: player
-				)
-			}
-		}
-		case "startMatch": {
-			if (state.phase !== "lobby" || state.players.length < MIN_PLAYERS) {
-				return state
-			}
-			const round = createRound(state, action.round)
-			if (round === null) {
-				return state
-			}
-
-			return appendRoundAndAdvanceCounter(
-				{
+	const nextState = Match.value(action).pipe(
+		Match.tagsExhaustive({
+			joinLobby: ({ player, ready }) => {
+				if (state.phase !== "lobby") {
+					return state
+				}
+				const joinedAt = Date.now()
+				return {
 					...state,
-					matchId: action.matchId,
-					startedAt: round.startedAt
-				},
-				round
-			)
-		}
-		case "startRound": {
-			if (state.phase !== "between-rounds") {
-				return state
-			}
+					players: upsertPlayer(state.players, {
+						id: player.id,
+						name: player.name,
+						ready: ready ?? false,
+						score: 0,
+						joinedAt
+					})
+				}
+			},
+			leaveLobby: ({ playerId }) => {
+				if (state.phase !== "lobby") {
+					return state
+				}
 
-			const round = createRound(state, action.round)
-			if (round === null) {
-				return state
-			}
+				return {
+					...state,
+					players: state.players.filter((player) => player.id !== playerId)
+				}
+			},
+			setReady: ({ playerId, ready }) => {
+				if (state.phase !== "lobby") {
+					return state
+				}
 
-			return appendRoundAndAdvanceCounter(state, round)
-		}
-		case "submitWord": {
-			if (state.phase !== "in-round") {
-				return state
-			}
+				return {
+					...state,
+					players: state.players.map((player) =>
+						player.id === playerId
+							? { ...player, ready }
+							: player
+					)
+				}
+			},
+			startMatch: ({ matchId, round }) => {
+				if (state.phase !== "lobby" || state.players.length < MIN_PLAYERS) {
+					return state
+				}
 
-			const round = getCurrentRound(state)
-			if (round === null || round.status !== "active" || round.id !== action.roundId) {
-				return state
-			}
-			if (round.activePlayerId !== null && round.activePlayerId !== action.playerId) {
-				return state
-			}
-			if (action.word.trim().length === 0 || action.points < 0) {
-				return state
-			}
-			if (state.players.find((player) => player.id === action.playerId) === undefined) {
-				return state
-			}
-			if (
-				state.scoreLedger.some((entry) =>
-					entry.roundId === action.roundId
-					&& entry.playerId === action.playerId
-					&& entry.word === action.word
+				const nextRound = createRound(state, round)
+				if (nextRound === null) {
+					return state
+				}
+
+				return appendRoundAndAdvanceCounter(
+					{
+						...state,
+						matchId,
+						startedAt: nextRound.startedAt
+					},
+					nextRound
 				)
-			) {
-				return state
-			}
+			},
+			startRound: ({ round }) => {
+				if (state.phase !== "between-rounds") {
+					return state
+				}
 
-			const scoreEntry: ScoreEntry = {
-				id: `claim-${state.nextScoreEntryId}`,
-				playerId: action.playerId,
-				roundId: action.roundId,
-				points: action.points,
-				word: action.word,
-				path: action.path,
-				submittedAt: action.submittedAt
-			}
+				const nextRound = createRound(state, round)
+				if (nextRound === null) {
+					return state
+				}
 
-			const updatedRound: GameRound = {
-				...round,
-				scoreEntries: [...round.scoreEntries, scoreEntry]
-			}
+				return appendRoundAndAdvanceCounter(state, nextRound)
+			},
+			submitWord: (submitAction) => {
+				if (state.phase !== "in-round") {
+					return state
+				}
 
-			return {
-				...state,
-				players: updatePlayerScore(state.players, action.playerId, action.points),
-				rounds: replaceRound(state.rounds, updatedRound),
-				scoreLedger: [...state.scoreLedger, scoreEntry],
-				nextScoreEntryId: state.nextScoreEntryId + 1
-			}
-		}
-		case "advanceTurn": {
-			if (state.phase !== "in-round") {
-				return state
-			}
+				const round = getCurrentRound(state)
+				if (round === null || round.status !== "active" || round.id !== submitAction.roundId) {
+					return state
+				}
+				if (round.activePlayerId !== null && round.activePlayerId !== submitAction.playerId) {
+					return state
+				}
+				if (submitAction.word.trim().length === 0 || submitAction.points < 0) {
+					return state
+				}
+				if (state.players.find((player) => player.id === submitAction.playerId) === undefined) {
+					return state
+				}
+				if (
+					state.scoreLedger.some((entry) =>
+						entry.roundId === submitAction.roundId
+						&& entry.playerId === submitAction.playerId
+						&& entry.word === submitAction.word
+					)
+				) {
+					return state
+				}
 
-			const round = getCurrentRound(state)
-			if (round === null || round.status !== "active" || round.id !== action.roundId || round.turnOrder.length === 0) {
-				return state
-			}
+				const scoreEntry: ScoreEntry = {
+					id: `claim-${state.nextScoreEntryId}`,
+					playerId: submitAction.playerId,
+					roundId: submitAction.roundId,
+					points: submitAction.points,
+					word: submitAction.word,
+					path: submitAction.path,
+					submittedAt: submitAction.submittedAt
+				}
 
-			const nextPlayerIndex = action.nextPlayerId !== undefined
-				? round.turnOrder.indexOf(action.nextPlayerId)
-				: round.activePlayerIndex === null
-				? 0
-				: (round.activePlayerIndex + 1) % round.turnOrder.length
+				const updatedRound: GameRound = {
+					...round,
+					scoreEntries: [...round.scoreEntries, scoreEntry]
+				}
 
-			if (nextPlayerIndex < 0) {
-				return state
-			}
+				return {
+					...state,
+					players: updatePlayerScore(state.players, submitAction.playerId, submitAction.points),
+					rounds: replaceRound(state.rounds, updatedRound),
+					scoreLedger: [...state.scoreLedger, scoreEntry],
+					nextScoreEntryId: state.nextScoreEntryId + 1
+				}
+			},
+			advanceTurn: (turnAction) => {
+				if (state.phase !== "in-round") {
+					return state
+				}
 
-			const nextRound: GameRound = {
-				...round,
-				activePlayerIndex: nextPlayerIndex,
-				activePlayerId: round.turnOrder[nextPlayerIndex] ?? null
-			}
+				const round = getCurrentRound(state)
+				if (
+					round === null || round.status !== "active" || round.id !== turnAction.roundId || round.turnOrder.length === 0
+				) {
+					return state
+				}
 
-			return {
-				...state,
-				rounds: replaceRound(state.rounds, nextRound)
-			}
-		}
-		case "endRound": {
-			if (state.phase !== "in-round") {
-				return state
-			}
+				const nextPlayerIndex = turnAction.nextPlayerId !== undefined
+					? round.turnOrder.indexOf(turnAction.nextPlayerId)
+					: round.activePlayerIndex === null
+					? 0
+					: (round.activePlayerIndex + 1) % round.turnOrder.length
 
-			const round = getCurrentRound(state)
-			if (round === null || round.status !== "active" || round.id !== action.roundId) {
-				return state
-			}
+				if (nextPlayerIndex < 0) {
+					return state
+				}
 
-			const endedRound: GameRound = {
-				...round,
-				status: "ended",
-				endedAt: action.endedAt
-			}
+				const nextRound: GameRound = {
+					...round,
+					activePlayerIndex: nextPlayerIndex,
+					activePlayerId: round.turnOrder[nextPlayerIndex] ?? null
+				}
 
-			return {
-				...state,
-				phase: "between-rounds",
-				rounds: replaceRound(state.rounds, endedRound)
-			}
-		}
-		case "resetMatch": {
-			return createInitialGameState()
-		}
-	}
+				return {
+					...state,
+					rounds: replaceRound(state.rounds, nextRound)
+				}
+			},
+			endRound: (endAction) => {
+				if (state.phase !== "in-round") {
+					return state
+				}
+
+				const round = getCurrentRound(state)
+				if (round === null || round.status !== "active" || round.id !== endAction.roundId) {
+					return state
+				}
+
+				const endedRound: GameRound = {
+					...round,
+					status: "ended",
+					endedAt: endAction.endedAt
+				}
+
+				return {
+					...state,
+					phase: "between-rounds" as const,
+					rounds: replaceRound(state.rounds, endedRound)
+				}
+			},
+			resetMatch: () => createInitialGameState()
+		})
+	) satisfies GameStateSnapshot
+	return nextState
 }
 
 export class GameState extends Context.Service<GameState, GameStateService>()("spellcast/GameState") {}
 
 export const make = Effect.sync(() => {
-	let matchState!: Atom.Writable<GameStateSnapshot, GameStateAction>
-
-	matchState = Atom.writable(
+	const state = Atom.writable<GameStateSnapshot, GameStateAction>(
 		() => createInitialGameState(),
 		(ctx, action) => {
-			const currentState = ctx.get(matchState)
+			const currentState = ctx.get(state)
 			const nextState = reduceGameState(currentState, action)
 			if (nextState !== currentState) {
 				ctx.setSelf(nextState)
@@ -441,9 +430,7 @@ export const make = Effect.sync(() => {
 		}
 	)
 
-	return GameState.of({
-		state: matchState
-	})
+	return GameState.of({ state })
 })
 
 export const layerFresh = Layer.fresh(Layer.effect(GameState, make))

@@ -1,7 +1,8 @@
-import { Effect, Layer } from "effect"
+import { Data, Effect, Layer } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
+import type { GameStateAction } from "./GameState"
 import * as GameState from "./GameState"
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
@@ -90,6 +91,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			ctx.set(playerMeta, meta)
 			ctx.setSelf(trimmedName)
 		})
+		const { joinLobby } = Data.taggedEnum<GameStateAction>()
 		const joinCurrentGameLobby = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			let meta = get(playerMeta)
 			const trimmedName = meta.name.trim()
@@ -98,7 +100,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				meta = { ...meta, name: newName }
 				get.set(playerMeta, meta)
 			}
-			get.set(currentGame, { type: "joinLobby", player: meta })
+			get.set(currentGame, joinLobby({ player: meta }))
 		}))
 		const playerId = Atom.readable((get) => get(playerMeta).id)
 		return {
