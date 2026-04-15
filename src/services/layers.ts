@@ -2,34 +2,44 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 
+import { Exit, Scope } from "effect"
 import { pipe } from "effect/Function"
-import { FetchHttpClient } from "effect/unstable/http"
+import { Atom } from "effect/unstable/reactivity"
 import * as BoardService from "./BoardService"
-import { BoggleSolver } from "./BoggleSolver"
-import { currentWordLayer, CurrentWordService } from "./CurrentWordService"
-import * as GameState from "./GameStateMachine"
+import { CurrentWordService } from "./CurrentWordService"
+import * as GameStateMachine from "./GameStateMachine"
 import { ClientPlayerState } from "./PlayerState"
 import { WordList } from "./WordList"
 
-export const gameLayer = pipe(
-	Layer.provideMerge(
-		currentWordLayer,
-		Layer.mergeAll(
-			Layer.provideMerge(
-				Layer.provide(BoardService.live, BoggleSolver.layer),
-				Layer.provide(WordList.layerWordnik, FetchHttpClient.layer)
-			),
-			Layer.provideMerge(
-				ClientPlayerState.layerFresh,
-				GameState.layerFresh
-			)
-		)
+async function createGameSession() {
+	const memoMap = Layer.makeMemoMapUnsafe()
+	const BoardLayer = Layer.provide(BoardService.live, WordList.layerWordnik)
+	const boardAtomRuntime = Atom.context({ memoMap })(BoardLayer)
+	const HostLayer = Layer.effect(
+		GameStateMachine.GameStateMachine,
+		GameStateMachine.make(boardAtomRuntime)
 	)
-)
 
-const gameContext = await Effect.runPromise(Effect.scoped(Layer.build(gameLayer)))
+	const GameLayer = pipe(
+		Layer.provideMerge(CurrentWordService.layer, BoardLayer),
+		Layer.provideMerge(ClientPlayerState.layerFresh),
+		Layer.provideMerge(HostLayer)
+	)
+	const scope = Scope.makeUnsafe()
+	return {
+		memoMap: memoMap,
+		gameContext: await Effect.runPromise(Effect.gen(function*() {
+			return yield* Layer.buildWithMemoMap(GameLayer, memoMap, scope)
+		})),
+		closeGame: () => {
+			Scope.close(scope, Exit.succeed(undefined))
+		}
+	}
+}
+
+export const { gameContext } = await createGameSession()
 
 export const boardService = Context.get(gameContext, BoardService.BoardService)
 export const currentWordService = Context.get(gameContext, CurrentWordService)
 export const playerState = Context.get(gameContext, ClientPlayerState)
-export const currentGameStateMachine = Context.get(gameContext, GameState.GameStateMachine)
+export const currentGameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine)

@@ -103,7 +103,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 		}))
 		const playerId = Atom.readable((get) => get(playerMeta).id)
 		const startCurrentGame = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
-			const game = get(currentGame)
+			const game = yield* get.result(currentGame)
 			get.set(
 				currentGame,
 				startMatch({

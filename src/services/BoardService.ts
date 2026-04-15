@@ -7,7 +7,6 @@ import { pipe } from "effect/Function"
 import type { AsyncResult } from "effect/unstable/reactivity"
 import { type Board, BOARD_SIZE, type Path, type Tile } from "../types/game"
 import { BoardGenerator } from "./BoardGenerator"
-import { BoggleSolver } from "./BoggleSolver"
 
 type ScoringType = "letter-points" | "word-length"
 const letterPointScores = {
@@ -62,21 +61,22 @@ export class BoardService extends Context.Service<BoardService, {
 	readonly getTileScore: (tile: Tile) => number
 	readonly regenerateBoard: Atom.AtomResultFn<void, void>
 	readonly boardSolutions: Atom.Atom<AsyncResult.AsyncResult<{ paths: Array<Path>; words: Set<string> }>>
-}>()("spellcast/BoardService") {}
+}>()("host/BoardService") {}
 
 export const make = Effect.gen(function*() {
 	const scoringType = "letter-points" as ScoringType
 	const scoringMethod: keyof typeof letterPointScores = "spellCast"
 	const boardGenerator = yield* BoardGenerator
-	const makeNewBoard = boardGenerator.generate(BOARD_SIZE, {
+	const genNewBoard = boardGenerator.generate(BOARD_SIZE, {
 		maxOccurrencesPerLetter: 4,
 		minAvgWordLength: 4.5
 	})
-	const boardTiles = Atom.make(yield* makeNewBoard)
-	const tileCount = Atom.make((get) => get(boardTiles).length)
+	const generation = yield* genNewBoard
+	const lastGeneration = Atom.make(generation)
+	const boardTiles = Atom.make((get) => get(lastGeneration).board)
+	const tileCount = Atom.make((get) => get(lastGeneration).board.length)
 	const regenerateBoard = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
-		const nextBoard = yield* makeNewBoard
-		get.set(boardTiles, nextBoard)
+		get.set(lastGeneration, yield* genNewBoard)
 	}))
 	const getTileScore = (tile: Tile) => {
 		if (scoringType === "word-length") {
@@ -87,12 +87,9 @@ export const make = Effect.gen(function*() {
 		const letterScoreLookup = letterPointScoreLookup[scoringMethod]
 		return letterScoreLookup[tile.letter as Letter] || 0
 	}
-
-	const solver = yield* BoggleSolver
 	const boardSolutions = Atom.make(Effect.fn(function*(get) {
-		return yield* solver.solve(get(boardTiles))
+		return get(lastGeneration).solutions
 	})).pipe(Atom.keepAlive)
-
 	return BoardService.of({
 		boardTiles,
 		tileCount,
@@ -102,5 +99,5 @@ export const make = Effect.gen(function*() {
 	})
 })
 
-export const layerFresh = Layer.fresh(Layer.effect(BoardService, make))
-export const live = Layer.provide(layerFresh, BoardGenerator.live)
+export const layer = Layer.effect(BoardService, make)
+export const live = Layer.provide(layer, BoardGenerator.live)

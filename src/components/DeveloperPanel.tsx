@@ -1,15 +1,23 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { Data } from "effect"
 import { AsyncResult } from "effect/unstable/reactivity"
-import { type Component, For } from "solid-js"
-import type { GameStateAction } from "../services/GameStateMachine"
+import { type Component, createEffect, createSignal, For } from "solid-js"
+import type { GameStateAction, GameStateSnapshot } from "../services/GameStateMachine"
 import { boardService, currentGameStateMachine, playerState } from "../services/layers"
 
 const DeveloperPanel: Component = () => {
 	const regenerateBoard = useAtomSet(() => boardService.regenerateBoard)
 	const resetMatch = useAtomSet(() => currentGameStateMachine)
 	const clearSelectionPath = useAtomSet(() => playerState.clearSelectionPath)
-	const matchState = useAtomValue(() => currentGameStateMachine)
+	const currentGame = useAtomValue(() => currentGameStateMachine)
+	const [matchState, setMatchState] = createSignal<GameStateSnapshot | undefined>()
+	createEffect(() =>
+		AsyncResult.match(currentGame(), {
+			onSuccess: (result) => setMatchState(result.value),
+			onInitial: () => setMatchState(),
+			onFailure: () => setMatchState()
+		})
+	)
 	const solutions = useAtomValue(() => boardService.boardSolutions)
 
 	const handleRegenerate = () => {
@@ -29,15 +37,15 @@ const DeveloperPanel: Component = () => {
 			<div class="mt-3 rounded-lg border border-shell bg-paper-100/80 px-3 py-2 text-[0.72rem] leading-5 text-ink">
 				<div class="flex items-center justify-between gap-3">
 					<span class="uppercase tracking-[0.2em] text-label-soft">Match phase</span>
-					<span class="font-semibold">{matchState().phase}</span>
+					<span class="font-semibold">{matchState()?.phase}</span>
 				</div>
 				<div class="mt-1 flex items-center justify-between gap-3 text-label-muted">
 					<span>Players</span>
-					<span>{matchState().players.length}</span>
+					<span>{matchState()?.players.length}</span>
 				</div>
 				<div class="flex items-center justify-between gap-3 text-label-muted">
 					<span>Rounds</span>
-					<span>{matchState().rounds.length}</span>
+					<span>{matchState()?.rounds.length}</span>
 				</div>
 				<button
 					type="button"

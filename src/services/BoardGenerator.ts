@@ -61,14 +61,20 @@ const make = Effect.gen(function*() {
 					break
 				}
 			}
-			return board
+			return {
+				board,
+				solutions: yield* solver.solve(board)
+			}
 		})
 	}
 })
 
-export class BoardGenerator extends Context.Service<BoardGenerator>()("app/BoardGeneratorService", {
+export class BoardGenerator extends Context.Service<BoardGenerator>()("host/BoardGeneratorService", {
 	make
 }) {
 	static layer = Layer.effect(BoardGenerator, make)
-	static live = Layer.provide(Layer.effect(BoardGenerator, make), LetterFrequencyAnalyzer.layer)
+	static live = Layer.provide(
+		Layer.effect(BoardGenerator, make),
+		Layer.mergeAll(LetterFrequencyAnalyzer.layer, BoggleSolver.layer)
+	)
 }

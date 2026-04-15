@@ -30,12 +30,6 @@ const getTilePathScore = (path: Array<Tile>) =>
 		)
 	)
 
-export class CurrentWordService extends Context.Service<CurrentWordService, {
-	readonly word: Atom.Atom<string>
-	readonly isCurrentWordValid: Atom.Atom<AsyncResult<boolean>>
-	readonly currentWordScore: Atom.Atom<AsyncResult<number>>
-}>()("spellcast/CurrentWordService") {}
-
 export const make = Effect.gen(function*() {
 	const board = yield* BoardService
 	const player = yield* ClientPlayerState
@@ -78,4 +72,10 @@ export const make = Effect.gen(function*() {
 	})
 })
 
-export const currentWordLayer = Layer.effect(CurrentWordService, make)
+export class CurrentWordService extends Context.Service<CurrentWordService, {
+	readonly word: Atom.Atom<string>
+	readonly isCurrentWordValid: Atom.Atom<AsyncResult<boolean>>
+	readonly currentWordScore: Atom.Atom<AsyncResult<number>>
+}>()("spellcast/CurrentWordService") {
+	static layer = Layer.effect(CurrentWordService, make)
+}

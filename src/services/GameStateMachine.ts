@@ -1,7 +1,9 @@
-import { Context, type Data, Effect, Match } from "effect"
-import * as Layer from "effect/Layer"
+import { Context, Data, Effect, Match, Option, pipe } from "effect"
+import type { HttpClientError } from "effect/unstable/http/HttpClientError"
+import { AsyncResult } from "effect/unstable/reactivity"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Path } from "../types/game"
+import * as BoardService from "./BoardService"
 
 export const MIN_PLAYERS = 1
 
@@ -125,6 +127,32 @@ export type GameStateAction = Data.TaggedEnum<{
 	resetMatch: {}
 }>
 
+export class CurrentRoundNotFound extends Data.TaggedError("CurrentRoundNotFound")<{
+	readonly message: string
+	readonly state: GameStateSnapshot
+}> {}
+export class RoundInactive extends Data.TaggedError("RoundInactive")<{
+	readonly message: string
+	readonly state: GameStateSnapshot
+}> {}
+export class NotEnoughPlayers extends Data.TaggedError("NotEnoughPlayers")<{
+	readonly message: string
+}> {}
+export class InvalidStateTransition extends Data.TaggedError("InvalidStateTransition")<{
+	readonly message: string
+	readonly action: GameStateAction
+	readonly state: GameStateSnapshot
+}> {}
+
+export class EmptyWordSubmitted extends Data.TaggedError("EmptyWordSubmitted")<{
+	readonly message: string
+}> {}
+
+export class InvalidActor extends Data.TaggedError("InvalidActor")<{
+	readonly message: string
+	action: GameStateAction
+}> {}
+
 const createInitialGameState = (): GameStateSnapshot => ({
 	matchId: null,
 	startedAt: null,
@@ -136,30 +164,6 @@ const createInitialGameState = (): GameStateSnapshot => ({
 	nextRoundId: 1,
 	nextScoreEntryId: 1
 })
-/** * Normalizes the turn order by filtering out invalid player IDs and duplicates while preserving the original order.
- *
- * @param turnOrder - The original turn order as an array of player IDs.
- * @param players - The list of current players in the lobby.
- * @returns A normalized array of player IDs representing the turn order.
- */
-const normalizeTurnOrder = (
-	turnOrder: ReadonlyArray<string>,
-	players: ReadonlyArray<LobbyPlayer>
-): Array<string> => {
-	const allowedPlayerIds = new Set(players.map((player) => player.id))
-	const seen = new Set<string>()
-	const normalized: Array<string> = []
-
-	for (const playerId of turnOrder) {
-		if (!allowedPlayerIds.has(playerId) || seen.has(playerId)) {
-			continue
-		}
-		seen.add(playerId)
-		normalized.push(playerId)
-	}
-
-	return normalized
-}
 
 const getCurrentRound = (state: GameStateSnapshot): GameRound | null => {
 	return state.currentRoundId
@@ -204,15 +208,28 @@ const updatePlayerScore = (
 	return updatedPlayers
 }
 
-const createRound = (
+const makeRound = Effect.fn(function*(
 	state: GameStateSnapshot,
 	roundInput: RoundStartInput
-): GameRound | null => {
-	const turnOrder = normalizeTurnOrder(roundInput.turnOrder, state.players)
-	if (turnOrder.length === 0) {
-		return null
+) {
+	if (state.players.length < MIN_PLAYERS) {
+		yield* new NotEnoughPlayers({ message: `At least ${MIN_PLAYERS} players are required to start a round` })
 	}
 
+	// filter out invalid player IDs and duplicates while preserving the original order.
+	const allowedPlayerIds = new Set(state.players.map((player) => player.id))
+	const seen = new Set<string>()
+	const turnOrder: Array<string> = []
+	for (const playerId of roundInput.turnOrder) {
+		if (!allowedPlayerIds.has(playerId) || seen.has(playerId)) {
+			continue
+		}
+		seen.add(playerId)
+		turnOrder.push(playerId)
+	}
+	if (turnOrder.length < MIN_PLAYERS) {
+		yield* new NotEnoughPlayers({ message: `The given turn order has less than ${MIN_PLAYERS} players in this game` })
+	}
 	return {
 		id: state.nextRoundId,
 		status: RoundStatus.Active,
@@ -221,11 +238,11 @@ const createRound = (
 		durationMs: roundInput.durationMs,
 		turnOrder,
 		activePlayerIndex: 0,
-		activePlayerId: turnOrder[0] ?? null,
+		activePlayerId: turnOrder[0],
 		boardSeed: roundInput.boardSeed ?? null,
 		scoreEntries: []
 	}
-}
+})
 
 const replaceRound = (
 	rounds: ReadonlyArray<GameRound>,
@@ -249,215 +266,300 @@ export const createGameStateSnapshot = createInitialGameState
 export const reduceGameState = (
 	state: GameStateSnapshot,
 	action: GameStateAction
-): GameStateSnapshot => {
-	const nextState = Match.value(action).pipe(
-		Match.tagsExhaustive({
-			joinLobby: ({ player, ready }) => {
-				if (state.phase !== GamePhase.InLobby) {
-					return state
-				}
-				const joinedAt = Date.now()
-				return {
-					...state,
-					players: upsertPlayer(state.players, {
-						id: player.id,
-						name: player.name,
-						ready: ready ?? false,
-						score: 0,
-						joinedAt
+) =>
+	Effect.gen(function*() {
+		const board = yield* BoardService.BoardService
+		const nextState = yield* Match.value(action).pipe(
+			Match.tagsExhaustive({
+				joinLobby: ({ player, ready }) =>
+					Effect.gen(function*() {
+						if (state.phase !== GamePhase.InLobby) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot join lobby when game is not in lobby phase",
+								action,
+								state
+							})
+						}
+						return {
+							...state,
+							players: upsertPlayer(state.players, {
+								id: player.id,
+								name: player.name,
+								ready: ready ?? false,
+								score: 0,
+								joinedAt: Date.now()
+							})
+						}
+					}),
+				leaveLobby: ({ playerId }) =>
+					Effect.gen(function*() {
+						if (state.phase !== GamePhase.InLobby) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot leave lobby when game is not in lobby phase",
+								action,
+								state
+							})
+						}
+						return {
+							...state,
+							players: state.players.filter((player) => player.id !== playerId)
+						}
+					}),
+				setReady: ({ playerId, ready }) =>
+					Effect.gen(function*() {
+						if (state.phase !== GamePhase.InLobby) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot change ready status when game is not in lobby phase",
+								action,
+								state
+							})
+						}
+						return {
+							...state,
+							players: state.players.map((player) =>
+								player.id === playerId
+									? { ...player, ready }
+									: player
+							)
+						}
+					}),
+				startMatch: ({ matchId, round }) =>
+					Effect.gen(function*() {
+						if (state.phase !== GamePhase.InLobby) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot start match when game is out of lobby",
+								action,
+								state
+							})
+						}
+						if (state.players.length < MIN_PLAYERS) {
+							return yield* new NotEnoughPlayers({
+								message: `At least ${MIN_PLAYERS} players are required to start the match`
+							})
+						}
+						const nextRound = yield* makeRound(state, round)
+						return appendRoundAndAdvanceCounter(
+							{
+								...state,
+								matchId,
+								startedAt: nextRound.startedAt
+							},
+							nextRound
+						)
+					}),
+				startRound: ({ round }) =>
+					Effect.gen(function*() {
+						if (state.phase !== GamePhase.BetweenRounds) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot start round when game is not between rounds",
+								action,
+								state
+							})
+						}
+
+						const nextRound = yield* makeRound(state, round)
+						return appendRoundAndAdvanceCounter(state, nextRound)
+					}),
+				submitWord: (submitAction) =>
+					Effect.gen(function*() {
+						if (state.phase !== GamePhase.InRound) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot submit word when game is not in a round phase",
+								action: submitAction,
+								state
+							})
+						}
+						const round = getCurrentRound(state)
+						if (round === null) {
+							return yield* new CurrentRoundNotFound({
+								message: "Round not found for current game when trying to submit word",
+								state
+							})
+						}
+						if (round.status !== RoundStatus.Active) {
+							return yield* new RoundInactive({
+								message: "Cannot submit word when round is not active",
+								state
+							})
+						}
+						if (round.id !== submitAction.roundId) {
+							return yield* new RoundInactive({
+								message: "Cannot submit word for round that is not the current round",
+								state
+							})
+						}
+						if (submitAction.word.trim().length === 0) {
+							return yield* new EmptyWordSubmitted({
+								message: "Cannot submit empty word"
+							})
+						}
+						if (state.players.find((player) => player.id === submitAction.playerId) === undefined) {
+							return yield* new InvalidActor({
+								message: "Player submitting word is not part of the game",
+								action: submitAction
+							})
+						}
+						if (
+							state.scoreLedger.some((entry) =>
+								entry.roundId === submitAction.roundId
+								&& entry.playerId === submitAction.playerId
+							)
+						) {
+							return yield* new InvalidActor({
+								message: "Player has already submitted a word for this round",
+								action: submitAction
+							})
+						}
+						const scoreEntry: ScoreEntry = {
+							id: `claim-${state.nextScoreEntryId}`,
+							playerId: submitAction.playerId,
+							roundId: round.id,
+							points: submitAction.path.reduce((score, pathNode) => score + board.getTileScore(pathNode), 0),
+							word: submitAction.word,
+							path: submitAction.path,
+							submittedAt: submitAction.submittedAt
+						}
+						const updatedRound: GameRound = {
+							...round,
+							scoreEntries: [...round.scoreEntries, scoreEntry]
+						}
+						return {
+							...state,
+							players: updatePlayerScore(state.players, submitAction.playerId, scoreEntry.points),
+							rounds: replaceRound(state.rounds, updatedRound),
+							scoreLedger: [...state.scoreLedger, scoreEntry],
+							nextScoreEntryId: state.nextScoreEntryId + 1
+						}
+					}),
+				advanceTurn: (turnAction) =>
+					Effect.gen(function*() {
+						if (state.phase !== GamePhase.InRound) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot advance turn when game is not in a round phase",
+								action: turnAction,
+								state
+							})
+						}
+						const round = getCurrentRound(state)
+						if (round === null) {
+							return yield* new CurrentRoundNotFound({
+								message: "Round not found for current game when trying to advance turn",
+								state
+							})
+						}
+						if (round.status !== RoundStatus.Active) {
+							return yield* new RoundInactive({
+								message: "Cannot advance turn when current round is not active",
+								state
+							})
+						}
+						if (round.id !== turnAction.roundId) {
+							return yield* new RoundInactive({
+								message: `Cannot advance turn for round ${turnAction.roundId}. It is not the current round`,
+								state
+							})
+						}
+						const nextPlayerIndex = turnAction.nextPlayerId !== undefined
+							? round.turnOrder.indexOf(turnAction.nextPlayerId)
+							: round.activePlayerIndex === null
+							? 0
+							: (round.activePlayerIndex + 1) % round.turnOrder.length
+
+						if (nextPlayerIndex < 0) {
+							return yield* new InvalidStateTransition({
+								message: `Next player ID ${turnAction.nextPlayerId} is not in the turn order for the current round`,
+								action: turnAction,
+								state
+							})
+						}
+						const nextRound: GameRound = {
+							...round,
+							activePlayerIndex: nextPlayerIndex,
+							activePlayerId: round.turnOrder[nextPlayerIndex] ?? null
+						}
+						return {
+							...state,
+							rounds: replaceRound(state.rounds, nextRound)
+						}
+					}),
+				endRound: (endAction) =>
+					Effect.gen(function*() {
+						if (state.phase !== GamePhase.InRound) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot end round when game is not in a round",
+								action: endAction,
+								state
+							})
+						}
+						const round = getCurrentRound(state)
+						if (round === null) {
+							return yield* new CurrentRoundNotFound({
+								message: "Round not found for current game when trying to end round",
+								state
+							})
+						}
+						if (round.status !== RoundStatus.Active) {
+							return yield* new RoundInactive({
+								message: "Cannot end current round when it is not active",
+								state
+							})
+						}
+						if (round.id !== endAction.roundId) {
+							return yield* new RoundInactive({
+								message: `Cannot end round for round ${endAction.roundId}. It is not the current round`,
+								state
+							})
+						}
+						const endedRound: GameRound = {
+							...round,
+							status: RoundStatus.Ended,
+							endedAt: endAction.endedAt
+						}
+						return {
+							...state,
+							phase: GamePhase.BetweenRounds,
+							rounds: replaceRound(state.rounds, endedRound)
+						}
+					}),
+				resetMatch: () => Effect.sync(createInitialGameState)
+			})
+		)
+		return nextState
+	})
+
+export const make = Effect.fn(
+	function*(runtime: Atom.AtomRuntime<BoardService.BoardService, HttpClientError | never>) {
+		const initialValue = createInitialGameState()
+		const self = runtime.fn(
+			Effect.fn(function*(action: GameStateAction, ctx: Atom.FnContext) {
+				const currentState = pipe(
+					ctx.self<AsyncResult.AsyncResult<GameStateSnapshot>>(),
+					Option.andThen(AsyncResult.value),
+					Option.getOrElse(() => {
+						console.warn("Failed to find current game state. Returning initial value.", { action })
+						return initialValue
 					})
-				}
-			},
-			leaveLobby: ({ playerId }) => {
-				if (state.phase !== GamePhase.InLobby) {
-					return state
-				}
-
-				return {
-					...state,
-					players: state.players.filter((player) => player.id !== playerId)
-				}
-			},
-			setReady: ({ playerId, ready }) => {
-				if (state.phase !== GamePhase.InLobby) {
-					return state
-				}
-
-				return {
-					...state,
-					players: state.players.map((player) =>
-						player.id === playerId
-							? { ...player, ready }
-							: player
-					)
-				}
-			},
-			startMatch: ({ matchId, round }) => {
-				if (state.phase !== GamePhase.InLobby || state.players.length < MIN_PLAYERS) {
-					return state
-				}
-
-				const nextRound = createRound(state, round)
-				if (nextRound === null) {
-					return state
-				}
-
-				return appendRoundAndAdvanceCounter(
-					{
-						...state,
-						matchId,
-						startedAt: nextRound.startedAt
-					},
-					nextRound
 				)
-			},
-			startRound: ({ round }) => {
-				if (state.phase !== GamePhase.BetweenRounds) {
-					return state
+				yield* Effect.log(`Processing action: ${JSON.stringify(action)}`, currentState)
+				const nextState = yield* reduceGameState(currentState, action)
+				if (nextState !== currentState) {
+					yield* Effect.log(`Action success. Next state:`, nextState)
+					ctx.setSelf(nextState)
+					ctx.refresh(self) // trigger reactivity for any atoms depending on the game state
 				}
+				return nextState
+			}),
+			{ initialValue }
+		).pipe(Atom.keepAlive)
+		return self
+	}
+)
 
-				const nextRound = createRound(state, round)
-				if (nextRound === null) {
-					return state
-				}
-
-				return appendRoundAndAdvanceCounter(state, nextRound)
-			},
-			submitWord: (submitAction) => {
-				if (state.phase !== GamePhase.InRound) {
-					return state
-				}
-
-				const round = getCurrentRound(state)
-				if (round === null || round.status !== RoundStatus.Active || round.id !== submitAction.roundId) {
-					return state
-				}
-				if (round.activePlayerId !== null && round.activePlayerId !== submitAction.playerId) {
-					return state
-				}
-				if (submitAction.word.trim().length === 0 || submitAction.points < 0) {
-					return state
-				}
-				if (state.players.find((player) => player.id === submitAction.playerId) === undefined) {
-					return state
-				}
-				if (
-					state.scoreLedger.some((entry) =>
-						entry.roundId === submitAction.roundId
-						&& entry.playerId === submitAction.playerId
-						&& entry.word === submitAction.word
-					)
-				) {
-					return state
-				}
-
-				const scoreEntry: ScoreEntry = {
-					id: `claim-${state.nextScoreEntryId}`,
-					playerId: submitAction.playerId,
-					roundId: submitAction.roundId,
-					points: submitAction.points,
-					word: submitAction.word,
-					path: submitAction.path,
-					submittedAt: submitAction.submittedAt
-				}
-
-				const updatedRound: GameRound = {
-					...round,
-					scoreEntries: [...round.scoreEntries, scoreEntry]
-				}
-
-				return {
-					...state,
-					players: updatePlayerScore(state.players, submitAction.playerId, submitAction.points),
-					rounds: replaceRound(state.rounds, updatedRound),
-					scoreLedger: [...state.scoreLedger, scoreEntry],
-					nextScoreEntryId: state.nextScoreEntryId + 1
-				}
-			},
-			advanceTurn: (turnAction) => {
-				if (state.phase !== GamePhase.InRound) {
-					return state
-				}
-
-				const round = getCurrentRound(state)
-				if (
-					round === null || round.status !== RoundStatus.Active || round.id !== turnAction.roundId ||
-					round.turnOrder.length === 0
-				) {
-					return state
-				}
-
-				const nextPlayerIndex = turnAction.nextPlayerId !== undefined
-					? round.turnOrder.indexOf(turnAction.nextPlayerId)
-					: round.activePlayerIndex === null
-					? 0
-					: (round.activePlayerIndex + 1) % round.turnOrder.length
-
-				if (nextPlayerIndex < 0) {
-					return state
-				}
-
-				const nextRound: GameRound = {
-					...round,
-					activePlayerIndex: nextPlayerIndex,
-					activePlayerId: round.turnOrder[nextPlayerIndex] ?? null
-				}
-
-				return {
-					...state,
-					rounds: replaceRound(state.rounds, nextRound)
-				}
-			},
-			endRound: (endAction) => {
-				if (state.phase !== GamePhase.InRound) {
-					return state
-				}
-
-				const round = getCurrentRound(state)
-				if (round === null || round.status !== RoundStatus.Active || round.id !== endAction.roundId) {
-					return state
-				}
-
-				const endedRound: GameRound = {
-					...round,
-					status: RoundStatus.Ended,
-					endedAt: endAction.endedAt
-				}
-
-				return {
-					...state,
-					phase: GamePhase.BetweenRounds,
-					rounds: replaceRound(state.rounds, endedRound)
-				}
-			},
-			resetMatch: () => createInitialGameState()
-		})
-	) satisfies GameStateSnapshot
-	return nextState
-}
 /** Atom wrapped state machine for a single game/match */
-export class GameStateMachine
-	extends Context.Service<GameStateMachine, Atom.Writable<GameStateSnapshot, GameStateAction>>()(
-		"server/GameStateMachine"
-	)
-{}
-
-export const make = Effect.sync(() => {
-	const state = Atom.writable<GameStateSnapshot, GameStateAction>(
-		() => createInitialGameState(),
-		(ctx, action) => {
-			const currentState = ctx.get(state)
-			const nextState = reduceGameState(currentState, action)
-			if (nextState !== currentState) {
-				ctx.setSelf(nextState)
-			}
-		}
-	)
-
-	return GameStateMachine.of(state)
-})
-
-export const layerFresh = Layer.fresh(Layer.effect(GameStateMachine, make))
+export class GameStateMachine extends Context.Service<GameStateMachine>()(
+	"host/GameStateMachine",
+	{ make: make }
+) {}
 
 export const getPlayerById = (
 	state: GameStateSnapshot,

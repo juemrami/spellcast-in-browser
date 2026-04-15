@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Random } from "effect"
-import { HttpClient } from "effect/unstable/http"
+import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import wordnikWordListUrl from "../wordlists/wordnik.txt?url"
 
 const ENGLISH_ALPHABET = [
@@ -45,7 +45,7 @@ export class WordList extends Context.Service<WordList>()(
 		})
 	}
 ) {
-	static layerWordnik = Layer.effect(this, this.make(wordnikWordListUrl))
+	static layerWordnik = Layer.provide(Layer.effect(this, this.make(wordnikWordListUrl)), FetchHttpClient.layer)
 }
 
 export class LetterFrequencyAnalyzer extends Context.Service<LetterFrequencyAnalyzer>()("LetterFrequencyAnalyzer", {
