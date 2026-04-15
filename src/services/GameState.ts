@@ -5,10 +5,32 @@ import type { Path } from "../types/game"
 
 export const MIN_PLAYERS = 1
 
-export type GamePhase = "lobby" | "in-round" | "between-rounds"
-export type RoundStatus = "active" | "ended"
-export type RoundEndReason = "timer" | "manual" | "board-exhausted"
-export type AdvanceTurnReason = "word-submitted" | "timer" | "manual"
+export const GamePhase = {
+	InLobby: "lobby",
+	InRound: "in-round",
+	BetweenRounds: "between-rounds"
+} as const
+export type GamePhase = typeof GamePhase[keyof typeof GamePhase]
+
+export const RoundStatus = {
+	Active: "active",
+	Ended: "ended"
+} as const
+export type RoundStatus = typeof RoundStatus[keyof typeof RoundStatus]
+
+export const RoundEndReason = {
+	Timer: "timer",
+	Manual: "manual",
+	BoardExhausted: "board-exhausted"
+} as const
+export type RoundEndReason = typeof RoundEndReason[keyof typeof RoundEndReason]
+
+export const AdvanceTurnReason = {
+	WordSubmitted: "word-submitted",
+	Timer: "timer",
+	Manual: "manual"
+} as const
+export type AdvanceTurnReason = typeof AdvanceTurnReason[keyof typeof AdvanceTurnReason]
 
 export interface LobbyPlayer {
 	readonly id: string
@@ -109,7 +131,7 @@ export type GameStateAction = Data.TaggedEnum<{
 const createInitialGameState = (): GameStateSnapshot => ({
 	matchId: null,
 	startedAt: null,
-	phase: "lobby",
+	phase: GamePhase.InLobby,
 	players: [],
 	rounds: [],
 	currentRoundId: null,
@@ -196,7 +218,7 @@ const createRound = (
 
 	return {
 		id: state.nextRoundId,
-		status: "active",
+		status: RoundStatus.Active,
 		startedAt: roundInput.startedAt,
 		endedAt: null,
 		durationMs: roundInput.durationMs,
@@ -218,7 +240,7 @@ const appendRoundAndAdvanceCounter = (
 	round: GameRound
 ): GameStateSnapshot => ({
 	...state,
-	phase: "in-round",
+	phase: GamePhase.InRound,
 	startedAt: state.startedAt ?? round.startedAt,
 	rounds: [...state.rounds, round],
 	currentRoundId: round.id,
@@ -234,7 +256,7 @@ export const reduceGameState = (
 	const nextState = Match.value(action).pipe(
 		Match.tagsExhaustive({
 			joinLobby: ({ player, ready }) => {
-				if (state.phase !== "lobby") {
+				if (state.phase !== GamePhase.InLobby) {
 					return state
 				}
 				const joinedAt = Date.now()
@@ -250,7 +272,7 @@ export const reduceGameState = (
 				}
 			},
 			leaveLobby: ({ playerId }) => {
-				if (state.phase !== "lobby") {
+				if (state.phase !== GamePhase.InLobby) {
 					return state
 				}
 
@@ -260,7 +282,7 @@ export const reduceGameState = (
 				}
 			},
 			setReady: ({ playerId, ready }) => {
-				if (state.phase !== "lobby") {
+				if (state.phase !== GamePhase.InLobby) {
 					return state
 				}
 
@@ -274,7 +296,7 @@ export const reduceGameState = (
 				}
 			},
 			startMatch: ({ matchId, round }) => {
-				if (state.phase !== "lobby" || state.players.length < MIN_PLAYERS) {
+				if (state.phase !== GamePhase.InLobby || state.players.length < MIN_PLAYERS) {
 					return state
 				}
 
@@ -293,7 +315,7 @@ export const reduceGameState = (
 				)
 			},
 			startRound: ({ round }) => {
-				if (state.phase !== "between-rounds") {
+				if (state.phase !== GamePhase.BetweenRounds) {
 					return state
 				}
 
@@ -305,12 +327,12 @@ export const reduceGameState = (
 				return appendRoundAndAdvanceCounter(state, nextRound)
 			},
 			submitWord: (submitAction) => {
-				if (state.phase !== "in-round") {
+				if (state.phase !== GamePhase.InRound) {
 					return state
 				}
 
 				const round = getCurrentRound(state)
-				if (round === null || round.status !== "active" || round.id !== submitAction.roundId) {
+				if (round === null || round.status !== RoundStatus.Active || round.id !== submitAction.roundId) {
 					return state
 				}
 				if (round.activePlayerId !== null && round.activePlayerId !== submitAction.playerId) {
@@ -356,13 +378,14 @@ export const reduceGameState = (
 				}
 			},
 			advanceTurn: (turnAction) => {
-				if (state.phase !== "in-round") {
+				if (state.phase !== GamePhase.InRound) {
 					return state
 				}
 
 				const round = getCurrentRound(state)
 				if (
-					round === null || round.status !== "active" || round.id !== turnAction.roundId || round.turnOrder.length === 0
+					round === null || round.status !== RoundStatus.Active || round.id !== turnAction.roundId ||
+					round.turnOrder.length === 0
 				) {
 					return state
 				}
@@ -389,24 +412,24 @@ export const reduceGameState = (
 				}
 			},
 			endRound: (endAction) => {
-				if (state.phase !== "in-round") {
+				if (state.phase !== GamePhase.InRound) {
 					return state
 				}
 
 				const round = getCurrentRound(state)
-				if (round === null || round.status !== "active" || round.id !== endAction.roundId) {
+				if (round === null || round.status !== RoundStatus.Active || round.id !== endAction.roundId) {
 					return state
 				}
 
 				const endedRound: GameRound = {
 					...round,
-					status: "ended",
+					status: RoundStatus.Ended,
 					endedAt: endAction.endedAt
 				}
 
 				return {
 					...state,
-					phase: "between-rounds" as const,
+					phase: GamePhase.BetweenRounds,
 					rounds: replaceRound(state.rounds, endedRound)
 				}
 			},
