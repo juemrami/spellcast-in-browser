@@ -2,8 +2,7 @@ import { Data, Effect, Layer } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
-import type { GameStateAction } from "./GameState"
-import * as GameState from "./GameState"
+import { type GameStateAction, GameStateMachine } from "./GameStateMachine"
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	const rowDiff = Math.abs(tileA.row - tileB.row)
@@ -13,7 +12,7 @@ const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app/PlayerClientState", {
 	make: Effect.gen(function*() {
 		const selectionPath = Atom.make([] as Array<Tile>)
-		const { state: currentGame } = yield* GameState.GameState
+		const currentGame = yield* GameStateMachine
 		const tryUpdateSelectionPath = Atom.fn(Effect.fn(function*(tile: Tile, get: Atom.FnContext) {
 			const path = get(selectionPath)
 			const tail = path.at(-1)
@@ -91,7 +90,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			ctx.set(playerMeta, meta)
 			ctx.setSelf(trimmedName)
 		})
-		const { joinLobby } = Data.taggedEnum<GameStateAction>()
+		const { joinLobby, startMatch } = Data.taggedEnum<GameStateAction>()
 		const joinCurrentGameLobby = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			let meta = get(playerMeta)
 			const trimmedName = meta.name.trim()
@@ -103,6 +102,21 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			get.set(currentGame, joinLobby({ player: meta }))
 		}))
 		const playerId = Atom.readable((get) => get(playerMeta).id)
+		const startCurrentGame = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
+			const game = get(currentGame)
+			get.set(
+				currentGame,
+				startMatch({
+					matchId: crypto.randomUUID(),
+					round: {
+						startedAt: Date.now(),
+						durationMs: 120000,
+						turnOrder: game.players.map((player) => player.id),
+						boardSeed: crypto.randomUUID()
+					}
+				})
+			)
+		}))
 		return {
 			selectionPath,
 			tryUpdateSelectionPath,
@@ -112,7 +126,8 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				playerName,
 				playerId
 			},
-			joinCurrentGameLobby
+			joinCurrentGameLobby,
+			startCurrentGame
 		}
 	})
 }) {

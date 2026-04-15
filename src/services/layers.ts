@@ -7,7 +7,7 @@ import { FetchHttpClient } from "effect/unstable/http"
 import * as BoardService from "./BoardService"
 import { BoggleSolver } from "./BoggleSolver"
 import { currentWordLayer, CurrentWordService } from "./CurrentWordService"
-import * as GameState from "./GameState"
+import * as GameState from "./GameStateMachine"
 import { ClientPlayerState } from "./PlayerState"
 import { WordList } from "./WordList"
 
@@ -32,4 +32,4 @@ const gameContext = await Effect.runPromise(Effect.scoped(Layer.build(gameLayer)
 export const boardService = Context.get(gameContext, BoardService.BoardService)
 export const currentWordService = Context.get(gameContext, CurrentWordService)
 export const playerState = Context.get(gameContext, ClientPlayerState)
-export const gameState = Context.get(gameContext, GameState.GameState)
+export const currentGameStateMachine = Context.get(gameContext, GameState.GameStateMachine)

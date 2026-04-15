@@ -2,8 +2,8 @@ import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { type Component, createSignal, Show } from "solid-js"
 
 import { Match } from "effect"
-import { MIN_PLAYERS } from "../services/GameState"
-import { boardService, gameState, playerState } from "../services/layers"
+import { MIN_PLAYERS } from "../services/GameStateMachine"
+import { boardService, currentGameStateMachine, playerState } from "../services/layers"
 import Board from "./Board"
 import CurrentWord from "./CurrentWord"
 import DeveloperPanel from "./DeveloperPanel"
@@ -13,8 +13,9 @@ import { Switch as UiSwitch } from "./ui/switch"
 const GameLayout: Component = () => {
 	const tileCount = useAtomValue(() => boardService.tileCount)
 	const [isDeveloperPanelOpen, setDeveloperPanelOpen] = createSignal(false)
-	const [gamestate, setGamestate] = useAtom(() => gameState.state)
+	const gameState = useAtomValue(() => currentGameStateMachine)
 	const joinLobby = useAtomSet(() => playerState.joinCurrentGameLobby)
+	const startCurrentGame = useAtomSet(() => playerState.startCurrentGame)
 	const [playerName, setPlayerName] = useAtom(() => playerState.meta.playerName)
 	const playerId = useAtomValue(() => playerState.meta.playerId)
 
@@ -52,7 +53,7 @@ const GameLayout: Component = () => {
 					</div>
 				</header>
 				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-4 shadow-panel-hero sm:p-6">
-					{Match.value(gamestate()).pipe(
+					{Match.value(gameState()).pipe(
 						Match.when({ phase: "lobby" }, (state) => (
 							<form
 								class="flex w-full flex-col items-center gap-5"
@@ -136,17 +137,7 @@ const GameLayout: Component = () => {
 											if (state.players.length < MIN_PLAYERS) {
 												return
 											}
-
-											setGamestate({
-												type: "startMatch",
-												matchId: crypto.randomUUID(),
-												round: {
-													startedAt: Date.now(),
-													durationMs: 120000,
-													turnOrder: state.players.map((player) => player.id),
-													boardSeed: crypto.randomUUID()
-												}
-											})
+											startCurrentGame()
 										}}
 										disabled={state.players.length < MIN_PLAYERS}
 										class="inline-flex w-full items-center justify-center rounded-full border border-control-border bg-gradient-to-b from-control-from to-control-to px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-control-text shadow-button transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:brightness-100 sm:w-auto sm:min-w-36"

@@ -1,13 +1,15 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-solid"
+import { Data } from "effect"
 import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, For } from "solid-js"
-import { boardService, gameState, playerState } from "../services/layers"
+import type { GameStateAction } from "../services/GameStateMachine"
+import { boardService, currentGameStateMachine, playerState } from "../services/layers"
 
 const DeveloperPanel: Component = () => {
 	const regenerateBoard = useAtomSet(() => boardService.regenerateBoard)
-	const resetMatch = useAtomSet(() => gameState.state)
+	const resetMatch = useAtomSet(() => currentGameStateMachine)
 	const clearSelectionPath = useAtomSet(() => playerState.clearSelectionPath)
-	const matchState = useAtomValue(() => gameState.state)
+	const matchState = useAtomValue(() => currentGameStateMachine)
 	const solutions = useAtomValue(() => boardService.boardSolutions)
 
 	const handleRegenerate = () => {
@@ -40,7 +42,8 @@ const DeveloperPanel: Component = () => {
 				<button
 					type="button"
 					onClick={() => {
-						resetMatch({ type: "resetMatch" })
+						const { resetMatch: _resetMatch } = Data.taggedEnum<GameStateAction>()
+						resetMatch(_resetMatch())
 					}}
 					class="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-shell bg-paper-50 px-3 py-1.5 text-xs font-semibold tracking-[0.12em] text-ink transition hover:bg-paper-200 active:bg-paper-200"
 				>

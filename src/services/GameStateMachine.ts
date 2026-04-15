@@ -82,9 +82,6 @@ export interface GameStateSnapshot {
 	readonly nextScoreEntryId: number
 }
 
-export interface GameStateService {
-	readonly state: Atom.Writable<GameStateSnapshot, GameStateAction>
-}
 export type GameStateAction = Data.TaggedEnum<{
 	joinLobby: {
 		player: {
@@ -438,8 +435,12 @@ export const reduceGameState = (
 	) satisfies GameStateSnapshot
 	return nextState
 }
-
-export class GameState extends Context.Service<GameState, GameStateService>()("spellcast/GameState") {}
+/** Atom wrapped state machine for a single game/match */
+export class GameStateMachine
+	extends Context.Service<GameStateMachine, Atom.Writable<GameStateSnapshot, GameStateAction>>()(
+		"server/GameStateMachine"
+	)
+{}
 
 export const make = Effect.sync(() => {
 	const state = Atom.writable<GameStateSnapshot, GameStateAction>(
@@ -453,10 +454,10 @@ export const make = Effect.sync(() => {
 		}
 	)
 
-	return GameState.of({ state })
+	return GameStateMachine.of(state)
 })
 
-export const layerFresh = Layer.fresh(Layer.effect(GameState, make))
+export const layerFresh = Layer.fresh(Layer.effect(GameStateMachine, make))
 
 export const getPlayerById = (
 	state: GameStateSnapshot,
