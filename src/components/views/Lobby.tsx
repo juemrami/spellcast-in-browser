@@ -14,6 +14,7 @@ const Lobby: Component<LobbyProps> = (props) => {
 	const startCurrentGame = useAtomSet(() => playerState.startCurrentGame)
 	const [playerName, setPlayerName] = useAtom(() => playerState.meta.playerName)
 	const playerId = useAtomValue(() => playerState.meta.playerId)
+	const isInLobby = () => props.players.some((player) => player.id === playerId())
 
 	return (
 		<form
@@ -89,10 +90,10 @@ const Lobby: Component<LobbyProps> = (props) => {
 				</label>
 				<button
 					type="submit"
-					class="inline-flex w-full items-center justify-center rounded-full border border-control-border bg-gradient-to-b from-control-from to-control-to px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-control-text shadow-button transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-36"
+					class="inline-flex w-full items-center justify-center rounded-full border border-control-border bg-gradient-to-b from-control-from to-control-to px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-control-text shadow-button transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-36 whitespace-nowrap"
 					disabled={playerName().trim().length === 0}
 				>
-					Join lobby
+					{!isInLobby() ? "Join lobby" : "Update name"}
 				</button>
 			</div>
 			<div class="flex w-full flex-col items-stretch gap-2">

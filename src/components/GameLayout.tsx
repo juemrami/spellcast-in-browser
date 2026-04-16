@@ -50,7 +50,7 @@ const GameLayout: Component = () => {
 						onSuccess: ({ value: matchState }) =>
 							Match.value(matchState).pipe(
 								Match.when({ phase: "lobby" }, (state) => <Lobby players={state.players} />),
-								Match.when({ phase: "in-round" }, () => <GameBoard />),
+								Match.when({ phase: "in-round" }, (state) => <GameBoard state={state} />),
 								Match.when({ phase: "between-rounds" }, () => <></>),
 								Match.exhaustive
 							),

@@ -58,6 +58,10 @@
 	--color-app-green-200: #AAB08C;
 }
 
+@utility text-tightest {
+	text-box: trim-both cap alphabetic;
+}
+
 @utility selected-tile {
 	@apply bg-gradient-to-br from-purple-200 via-purple-300 to-purple-400;
 	@apply text-purple-900 ring-purple-300/30;
