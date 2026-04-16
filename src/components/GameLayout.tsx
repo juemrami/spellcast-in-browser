@@ -2,6 +2,7 @@ import { useAtomValue } from "@effect/atom-solid"
 import { Cause, Match, Option, pipe } from "effect"
 import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, createSignal, Show } from "solid-js"
+import { isInRound } from "../services/GameStateMachine"
 import { boardService, currentGameStateMachine } from "../services/layers"
 import DeveloperPanel from "./DeveloperPanel"
 import GameBoard from "./views/GameBoard"
@@ -59,20 +60,42 @@ const GameLayout: Component = () => {
 								Loading game...
 							</p>
 						),
-						onFailure: ({ cause }) => (
-							<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-red-500">
-								Failed to load game state.
-								{Option.getOrUndefined(
-									pipe(
-										Cause.findErrorOption(cause),
-										Option.map((error) => {
-											console.error(error)
-											return error.toString()
-										})
+						onFailure: ({ cause, previousSuccess }) => {
+							const Error = (<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-red-500">
+									Failed to load game state.
+									{Option.getOrUndefined(
+										pipe(
+											Cause.findErrorOption(cause),
+											Option.map((error) => {
+												console.error(error)
+												return error.toString()
+											})
+										)
+									)}
+								</p>)
+							const state = pipe(
+								previousSuccess,
+								Option.map(s => s.value),
+								Option.getOrUndefined
+							)
+							if(state === undefined) return Error;
+							return pipe(
+								cause,
+								Cause.findErrorOption,
+								Option.map(e => Match.value(e).pipe(
+									Match.tags({
+										"EmptyWordSubmitted": () => {
+											// todo: toast notification?
+											return isInRound(state) ? <GameBoard state={state} /> : undefined
+										},
+										"InvalidWordSubmitted": () => isInRound(state) ? <GameBoard state={state} /> : undefined
+									}),
+									Match.orElse(() => undefined)
 									)
-								)}
-							</p>
-						)
+								),
+								Option.getOrElse(() => Error)
+							)
+						}
 					})}
 				</section>
 			</div>

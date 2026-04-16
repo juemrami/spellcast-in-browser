@@ -1,13 +1,17 @@
-import { useAtomValue } from "@effect/atom-solid"
+import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { AsyncResult } from "effect/unstable/reactivity"
 import type { Component } from "solid-js"
-import { currentWordService } from "../../../services/layers"
+import { currentWordService, playerState } from "../../../services/layers"
 
 const SubmitButton: Component = () => {
 	const isCurrentWordValid = useAtomValue(() => currentWordService.isCurrentWordValid)
+	const submitCurrentWord = useAtomSet(() => playerState.submitSelectionPath)
 	return (
 		<button
 			type="button"
+			onClick={() => {
+				submitCurrentWord()
+			}}
 			disabled={AsyncResult.match(isCurrentWordValid(), {
 				onSuccess: (r) => r.value === false,
 				onFailure: () => true,

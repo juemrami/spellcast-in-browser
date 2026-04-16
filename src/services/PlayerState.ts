@@ -1,8 +1,8 @@
-import { Data, Effect, Layer } from "effect"
+import { Data, Effect, Layer, Option, pipe } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
-import { type GameStateAction, GameStateMachine } from "./GameStateMachine"
+import { type GameStateAction, GameStateMachine, isInRound } from "./GameStateMachine"
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	const rowDiff = Math.abs(tileA.row - tileB.row)
@@ -90,7 +90,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			ctx.set(playerMeta, meta)
 			ctx.setSelf(trimmedName)
 		})
-		const { joinLobby, startMatch } = Data.taggedEnum<GameStateAction>()
+		const { joinLobby, startMatch, submitWord } = Data.taggedEnum<GameStateAction>()
 		const joinCurrentGameLobby = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			let meta = get(playerMeta)
 			const trimmedName = meta.name.trim()
@@ -117,6 +117,37 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				})
 			)
 		}))
+		const submitSelectionPath = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
+			const path = get(selectionPath)
+			if (path.length === 0) return false
+			const recover = () => {
+				const result = get(currentGame)
+				if (result._tag === "Failure") {
+					const state = pipe(
+						result.previousSuccess,
+						Option.map((s) => s.value),
+						Option.filter((s) => isInRound(s)),
+						Option.getOrUndefined
+					)
+					if (state) {
+						return Effect.succeed(state)
+					}
+				}
+				return Effect.die("absurd")
+			}
+			const game = yield* (get.result(currentGame).pipe(
+				Effect.catchTag("InvalidWordSubmitted", recover),
+				Effect.catchTag("EmptyWordSubmitted", recover)
+			))
+			get.set(currentGame, submitWord({ path, playerId: get(playerId), roundId: game.currentRoundId ?? -1 }))
+			yield* get.result(currentGame).pipe(
+				Effect.catchTags({
+					"EmptyWordSubmitted": () => Effect.succeed(false),
+					"InvalidWordSubmitted": () => Effect.succeed(false)
+				})
+			)
+			return true
+		}))
 		return {
 			selectionPath,
 			tryUpdateSelectionPath,
@@ -127,7 +158,8 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				playerId
 			},
 			joinCurrentGameLobby,
-			startCurrentGame
+			startCurrentGame,
+			submitSelectionPath
 		}
 	})
 }) {

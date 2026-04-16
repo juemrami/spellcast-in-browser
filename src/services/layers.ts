@@ -2,9 +2,11 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 
+import { RegistryContext } from "@effect/atom-solid"
 import { Exit, Scope } from "effect"
 import { pipe } from "effect/Function"
-import { Atom } from "effect/unstable/reactivity"
+import { Atom, AtomRegistry } from "effect/unstable/reactivity"
+import { useContext } from "solid-js"
 import * as BoardService from "./BoardService"
 import { CurrentWordService } from "./CurrentWordService"
 import * as GameStateMachine from "./GameStateMachine"
@@ -13,8 +15,14 @@ import { WordList } from "./WordList"
 
 async function createGameSession() {
 	const memoMap = Layer.makeMemoMapUnsafe()
+	const AtomRegistryLayer = Layer.effect(
+		AtomRegistry.AtomRegistry,
+		Effect.succeed(useContext(RegistryContext))
+	)
 	const BoardLayer = Layer.provide(BoardService.live, WordList.layerWordnik)
-	const boardAtomRuntime = Atom.context({ memoMap })(BoardLayer)
+	const boardAtomRuntime = Atom.context({ memoMap })(
+		Layer.mergeAll(BoardLayer, AtomRegistryLayer)
+	)
 	const HostLayer = Layer.effect(
 		GameStateMachine.GameStateMachine,
 		GameStateMachine.make(boardAtomRuntime)

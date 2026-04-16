@@ -4,8 +4,8 @@ import * as Layer from "effect/Layer"
 import * as Atom from "effect/unstable/reactivity/Atom"
 
 import { pipe } from "effect/Function"
-import type { AsyncResult } from "effect/unstable/reactivity"
-import { type Board, BOARD_SIZE, type Path, type Tile } from "../types/game"
+import { toUpperCase } from "effect/String"
+import { BOARD_SIZE, type Tile } from "../types/game"
 import { BoardGenerator } from "./BoardGenerator"
 
 type ScoringType = "letter-points" | "word-length"
@@ -33,18 +33,18 @@ const letterPointScores = {
 } as const
 type PointScoreSystem = keyof typeof letterPointScores
 type Score = keyof typeof letterPointScores[PointScoreSystem]
-type Letter = typeof letterPointScores[PointScoreSystem][Score][number]
+type EnglishUpperLetter = typeof letterPointScores[PointScoreSystem][Score][number]
 
-const letterPointScoreLookup: Record<PointScoreSystem, Record<Letter, Score>> = pipe(
+const letterPointScoreLookup: Record<PointScoreSystem, Record<EnglishUpperLetter, Score>> = pipe(
 	Object.entries(
 		letterPointScores
 	).map(([system, scores]) => {
 		// @ts-ignore
-		const mappedScores: Record<Letter, Score> = {}
+		const mappedScores: Record<EnglishUpperLetter, Score> = {}
 		Object.entries(scores).forEach(([points, letters]) => {
 			letters.forEach(
 				(
-					letter: Letter
+					letter: EnglishUpperLetter
 				) => {
 					mappedScores[letter] = Number(points) as Score
 				}
@@ -54,14 +54,6 @@ const letterPointScoreLookup: Record<PointScoreSystem, Record<Letter, Score>> = 
 	}),
 	Object.fromEntries
 )
-
-export class BoardService extends Context.Service<BoardService, {
-	readonly boardTiles: Atom.Atom<Board>
-	readonly tileCount: Atom.Atom<number>
-	readonly getTileScore: (tile: Tile) => number
-	readonly regenerateBoard: Atom.AtomResultFn<void, void>
-	readonly boardSolutions: Atom.Atom<AsyncResult.AsyncResult<{ paths: Array<Path>; words: Set<string> }>>
-}>()("host/BoardService") {}
 
 export const make = Effect.gen(function*() {
 	const scoringType = "letter-points" as ScoringType
@@ -85,19 +77,19 @@ export const make = Effect.gen(function*() {
 			return 1
 		}
 		const letterScoreLookup = letterPointScoreLookup[scoringMethod]
-		return letterScoreLookup[tile.letter as Letter] || 0
+		return letterScoreLookup[toUpperCase(tile.letter)] || 0
 	}
 	const boardSolutions = Atom.make(Effect.fn(function*(get) {
 		return get(lastGeneration).solutions
 	})).pipe(Atom.keepAlive)
-	return BoardService.of({
+	return {
 		boardTiles,
 		tileCount,
 		getTileScore,
 		regenerateBoard,
 		boardSolutions
-	})
+	}
 })
-
+export class BoardService extends Context.Service<BoardService, Effect.Success<typeof make>>()("host/BoardService") {}
 export const layer = Layer.effect(BoardService, make)
 export const live = Layer.provide(layer, BoardGenerator.live)

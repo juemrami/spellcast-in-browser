@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Random } from "effect"
+import { toLowerCase } from "effect/String"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import wordnikWordListUrl from "../wordlists/wordnik.txt?url"
 
@@ -30,6 +31,11 @@ const ENGLISH_ALPHABET = [
 	"Y",
 	"Z"
 ] as const
+const ENGLISH_ALPHABET_LOWER = ENGLISH_ALPHABET.map(toLowerCase)
+export type EnglishLetterLower = typeof ENGLISH_ALPHABET_LOWER[number]
+
+const isEnglishLetter = (s: string): s is typeof ENGLISH_ALPHABET_LOWER[number] =>
+	ENGLISH_ALPHABET_LOWER.includes(s as any)
 
 export class WordList extends Context.Service<WordList>()(
 	"WordList",
@@ -38,9 +44,10 @@ export class WordList extends Context.Service<WordList>()(
 			const httpClient = yield* HttpClient.HttpClient
 			const response = yield* httpClient.get(wordListUrl)
 			const wordListTxt = yield* response.text
-			const wordList = wordListTxt.split("\n").map((word) => word.trim()).filter((word) => word.length > 0).map((w) =>
-				w.replace(/[^a-zA-Z]/g, "")
-			)
+			const wordList = wordListTxt.split("\n")
+				.map((word) => word.trim())
+				.filter((word) => word.length > 0)
+				.map((w) => w.replace(/[^a-zA-Z]/g, "").toLowerCase())
 			return wordList
 		})
 	}
@@ -51,34 +58,46 @@ export class WordList extends Context.Service<WordList>()(
 export class LetterFrequencyAnalyzer extends Context.Service<LetterFrequencyAnalyzer>()("LetterFrequencyAnalyzer", {
 	make: Effect.gen(function*() {
 		const wordList = yield* WordList
-		const letterFrequency: Record<string, number> = {}
+		type FrequencyRecord = Record<EnglishLetterLower, number>
+		const letterFrequency = {} as FrequencyRecord
 		for (const word of wordList) {
-			if (word.length < 4) continue // skip short words
+			// skip short words. short words are more likely to contain same characters, changes distribution
+			if (word.length < 4) continue
+			const localFreqs: Partial<FrequencyRecord> = {}
 			for (const letter of word) {
-				letterFrequency[letter] = (letterFrequency[letter] || 0) + 1
+				if (!isEnglishLetter(letter)) continue // skip words with non english characters
+				localFreqs[letter] = (localFreqs[letter] || 0) + 1
+			}
+			for (const letter of (word as unknown as EnglishLetterLower[])) {
+				letterFrequency[letter] = (letterFrequency[letter] || 0) + localFreqs[letter]!
 			}
 		}
-		const normalizedLetterFrequencies: Record<string, number> = yield* Effect.gen(function*() {
-			const totalLetters = Object.values(letterFrequency).reduce((sum, count) => sum + count, 0)
-			const normalized: Record<string, number> = {}
-			for (const letter in letterFrequency) {
-				normalized[letter] = Math.floor((letterFrequency[letter] / totalLetters) * 100)
+		for (const letter of ENGLISH_ALPHABET_LOWER) {
+			if (!letterFrequency[letter]) {
+				letterFrequency[letter] = 0
 			}
+		}
+		const normalizedLetterFrequencies: FrequencyRecord = yield* Effect.gen(function*() {
+			const totalLetters = Object.values(letterFrequency).reduce((sum, count) => sum + count, 0)
+			const normalized = {} as FrequencyRecord
+			Object.entries(letterFrequency).forEach(([letter, count]) => {
+				normalized[letter as EnglishLetterLower] = count === 0 ? 0 : Math.floor((count / totalLetters) * 100)
+			})
 			return normalized
 		})
-		const distributedAlphabet = ENGLISH_ALPHABET.map((letter) =>
-			Array(normalizedLetterFrequencies[letter.toLowerCase()] || 0).fill(letter as string)
+		const distributedAlphabet = ENGLISH_ALPHABET_LOWER.map((letter) =>
+			Array<EnglishLetterLower>(normalizedLetterFrequencies[letter] || 0).fill(letter)
 		).flat()
 		return {
 			frequencies: {
 				unigram: letterFrequency
 			},
-
+			/** Returns array of N random letters from the wordlist letters distribution */
 			sample: Effect.fn(function*(n: number, options: {
 				maxOccurrencesPerLetter?: number
 			} = {}) {
-				const result: Array<string> = []
-				const occurrences: Record<string, number> = {}
+				const result: Array<EnglishLetterLower> = []
+				const occurrences: Partial<FrequencyRecord> = {}
 				for (let i = 0; i < n; i++) {
 					const index = yield* Random.nextIntBetween(0, distributedAlphabet.length - 1)
 					const letter = distributedAlphabet[index]

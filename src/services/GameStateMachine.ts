@@ -1,4 +1,4 @@
-import { Context, Data, Effect, Match, Option, pipe } from "effect"
+import { Context, Data, Effect, Match, Option, pipe, Predicate } from "effect"
 import type { HttpClientError } from "effect/unstable/http/HttpClientError"
 import { AsyncResult } from "effect/unstable/reactivity"
 import * as Atom from "effect/unstable/reactivity/Atom"
@@ -56,9 +56,8 @@ export interface ScoreEntry {
 	readonly points: number
 	readonly word: string
 	readonly path: Path
-	readonly submittedAt: number
+	readonly submittedAtMs: number
 }
-
 export interface GameRound {
 	readonly id: number
 	readonly status: RoundStatus
@@ -72,7 +71,9 @@ export interface GameRound {
 	readonly scoreEntries: ReadonlyArray<ScoreEntry>
 }
 
+const GameStateSnapshotTypeId = "~GameStateMachine/GameStateSnapshot"
 export interface GameStateSnapshot {
+	[GameStateSnapshotTypeId]: typeof GameStateSnapshotTypeId
 	readonly matchId: string | null
 	readonly startedAt: number | null
 	readonly phase: GamePhase
@@ -83,6 +84,12 @@ export interface GameStateSnapshot {
 	readonly nextRoundId: number
 	readonly nextScoreEntryId: number
 }
+const makeGameState = (
+	state: Omit<GameStateSnapshot, typeof GameStateSnapshotTypeId> | GameStateSnapshot
+): GameStateSnapshot => ({
+	[GameStateSnapshotTypeId]: GameStateSnapshotTypeId,
+	...state
+})
 
 export type GameStateAction = Data.TaggedEnum<{
 	joinLobby: {
@@ -109,10 +116,7 @@ export type GameStateAction = Data.TaggedEnum<{
 	submitWord: {
 		roundId: number
 		playerId: string
-		word: string
 		path: Path
-		points: number
-		submittedAt: number
 	}
 	advanceTurn: {
 		roundId: number
@@ -147,23 +151,26 @@ export class InvalidStateTransition extends Data.TaggedError("InvalidStateTransi
 export class EmptyWordSubmitted extends Data.TaggedError("EmptyWordSubmitted")<{
 	readonly message: string
 }> {}
-
+export class InvalidWordSubmitted extends Data.TaggedError("InvalidWordSubmitted")<{
+	readonly message: string
+}> {}
 export class InvalidActor extends Data.TaggedError("InvalidActor")<{
 	readonly message: string
 	action: GameStateAction
 }> {}
 
-const createInitialGameState = (): GameStateSnapshot => ({
-	matchId: null,
-	startedAt: null,
-	phase: GamePhase.InLobby,
-	players: [],
-	rounds: [],
-	currentRoundId: null,
-	scoreLedger: [],
-	nextRoundId: 1,
-	nextScoreEntryId: 1
-})
+const createInitialGameState = (): GameStateSnapshot =>
+	makeGameState({
+		matchId: null,
+		startedAt: null,
+		phase: GamePhase.InLobby,
+		players: [],
+		rounds: [],
+		currentRoundId: null,
+		scoreLedger: [],
+		nextRoundId: 1,
+		nextScoreEntryId: 1
+	})
 
 const getCurrentRound = (state: GameStateSnapshot): GameRound | null => {
 	return state.currentRoundId
@@ -388,7 +395,8 @@ export const reduceGameState = (
 								state
 							})
 						}
-						if (submitAction.word.trim().length === 0) {
+						const word = submitAction.path.map((node) => node.letter).join("")
+						if (word.trim().length === 0) {
 							return yield* new EmptyWordSubmitted({
 								message: "Cannot submit empty word"
 							})
@@ -410,14 +418,20 @@ export const reduceGameState = (
 								action: submitAction
 							})
 						}
+						const boardSolutions = yield* Atom.getResult(board.boardSolutions)
+						if (!boardSolutions.words.has(word)) {
+							return yield* new InvalidWordSubmitted({
+								message: `\"${word}\" is not a valid word for the current board`
+							})
+						}
 						const scoreEntry: ScoreEntry = {
 							id: `claim-${state.nextScoreEntryId}`,
 							playerId: submitAction.playerId,
 							roundId: round.id,
 							points: submitAction.path.reduce((score, pathNode) => score + board.getTileScore(pathNode), 0),
-							word: submitAction.word,
+							word: word,
 							path: submitAction.path,
-							submittedAt: submitAction.submittedAt
+							submittedAtMs: Date.now()
 						}
 						const updatedRound: GameRound = {
 							...round,
@@ -527,38 +541,38 @@ export const reduceGameState = (
 		return nextState
 	})
 
+type FnRequirements<Fn extends (...args: any[]) => Effect.Effect<any, any, any>> = Effect.Services<ReturnType<Fn>>
 export const make = Effect.fn(
-	function*(runtime: Atom.AtomRuntime<BoardService.BoardService, HttpClientError | never>) {
+	function*(runtime: Atom.AtomRuntime<FnRequirements<typeof reduceGameState>, HttpClientError>) {
 		const initialValue = createInitialGameState()
-		const self = runtime.fn(
-			Effect.fn(function*(action: GameStateAction, ctx: Atom.FnContext) {
-				const currentState = pipe(
-					ctx.self<AsyncResult.AsyncResult<GameStateSnapshot>>(),
-					Option.andThen(AsyncResult.value),
-					Option.getOrElse(() => {
-						console.warn("Failed to find current game state. Returning initial value.", { action })
-						return initialValue
-					})
-				)
-				yield* Effect.log(`Processing action: ${JSON.stringify(action)}`, currentState)
-				const nextState = yield* reduceGameState(currentState, action)
-				if (nextState !== currentState) {
-					yield* Effect.log(`Action success. Next state:`, nextState)
-					ctx.setSelf(nextState)
-					ctx.refresh(self) // trigger reactivity for any atoms depending on the game state
-				}
-				return nextState
-			}),
-			{ initialValue }
-		).pipe(Atom.keepAlive)
+		const atomFn = Effect.fn(function*(action: GameStateAction, ctx: Atom.FnContext) {
+			const currentState = pipe(
+				ctx.self<AsyncResult.AsyncResult<GameStateSnapshot>>(),
+				Option.andThen(AsyncResult.value),
+				Option.getOrElse(() => {
+					console.warn("Failed to find current game state. Returning initial value.", { action })
+					return initialValue
+				})
+			)
+			// yield* Effect.log(`Processing action: ${JSON.stringify(action)}`, currentState)
+			const nextState = yield* reduceGameState(currentState, action)
+			if (nextState !== currentState) {
+				// yield* Effect.log(`Action success. Next state:`, nextState)
+				ctx.setSelf(AsyncResult.success(nextState))
+			}
+			return yield* Effect.succeed(nextState)
+		})
+		const self = runtime.fn(atomFn, { initialValue })
 		return self
 	}
 )
 
 /** Atom wrapped state machine for a single game/match */
-export class GameStateMachine extends Context.Service<GameStateMachine>()(
-	"host/GameStateMachine",
-	{ make: make }
+export class GameStateMachine extends Context.Service<
+	GameStateMachine,
+	Effect.Success<ReturnType<typeof make>>
+>()(
+	"host/GameStateMachine"
 ) {}
 
 export const getPlayerById = (
@@ -577,3 +591,11 @@ export const getRoundById = (
 ): GameRound | null => state.rounds.find((round) => round.id === roundId) ?? null
 
 export const getCurrentRoundSnapshot = getCurrentRound
+
+export const isInRound: Predicate.Refinement<unknown, GameStateSnapshot & { phase: typeof GamePhase.InRound }> = (
+	state
+): state is GameStateSnapshot & { phase: typeof GamePhase.InRound } =>
+	typeof state === "object"
+	&& state !== null
+	&& GameStateSnapshotTypeId in state
+	&& (state as GameStateSnapshot).phase === GamePhase.InRound

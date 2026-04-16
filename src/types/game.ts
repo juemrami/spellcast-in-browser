@@ -1,7 +1,9 @@
+import type { EnglishLetterLower } from "../services/WordList"
+
 export type TileType = "normal" | "gem" | "multiplier"
 
 export interface Tile {
-	readonly letter: string
+	readonly letter: EnglishLetterLower
 	readonly row: number
 	readonly col: number
 	readonly type: TileType

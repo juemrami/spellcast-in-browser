@@ -40,6 +40,7 @@ const dfs = (
 }
 type BoggleSolutions = {
 	paths: Array<Path>
+	/** Set of lowercase words found on the board */
 	words: Set<string>
 }
 export class BoggleSolver extends Context.Service<BoggleSolver>()(

@@ -14,7 +14,7 @@ const CurrentWord: Component = () => {
 			0 <span class="text-xs text-zinc-300">points</span>
 		</span>
 	)
-
+	const isEmptyWord = () => word() === ""
 	return (
 		<section class="rounded-[1.5rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 px-5 py-4 shadow-card">
 			<div class="flex items-center justify-between">
@@ -23,7 +23,7 @@ const CurrentWord: Component = () => {
 				</div>
 				<button
 					type="button"
-					disabled={word() === ""}
+					disabled={isEmptyWord()}
 					onClick={() => {
 						clearPlayerSelection()
 					}}
@@ -34,9 +34,9 @@ const CurrentWord: Component = () => {
 			</div>
 			<div class="mt-3 min-h-14 text-3xl font-black tracking-[0.22em] text-header sm:text-[2.25rem]">
 				<div class="flex flex-col items-start gap-0.5">
-					<span>{word() !== "" ? word() : "Trace a word"}</span>
+					<span>{!isEmptyWord() ? word().toUpperCase() : "Trace a word"}</span>
 					<div class="self-end px-2 text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-label-soft">
-						{word() === ""
+						{isEmptyWord()
 							? scorePlaceholder
 							: AsyncResult.match(getCurrentWordScore(), {
 								onSuccess: (pts) =>
