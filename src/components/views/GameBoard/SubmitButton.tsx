@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { AsyncResult } from "effect/unstable/reactivity"
 import type { Component } from "solid-js"
-import { currentWordService } from "../services/layers"
+import { currentWordService } from "../../../services/layers"
 
 const SubmitButton: Component = () => {
 	const isCurrentWordValid = useAtomValue(() => currentWordService.isCurrentWordValid)

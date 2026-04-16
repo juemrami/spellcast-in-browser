@@ -3,11 +3,8 @@ import { Cause, Match, Option, pipe } from "effect"
 import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, createSignal, Show } from "solid-js"
 import { boardService, currentGameStateMachine } from "../services/layers"
-import Board from "./Board"
-import CurrentWord from "./CurrentWord"
 import DeveloperPanel from "./DeveloperPanel"
-import SubmitButton from "./SubmitButton"
-import { Switch as UiSwitch } from "./ui/switch"
+import GameBoard from "./views/GameBoard"
 import Lobby from "./views/Lobby"
 
 const GameLayout: Component = () => {
@@ -53,24 +50,7 @@ const GameLayout: Component = () => {
 						onSuccess: ({ value: matchState }) =>
 							Match.value(matchState).pipe(
 								Match.when({ phase: "lobby" }, (state) => <Lobby players={state.players} />),
-								Match.when(
-									{ phase: "in-round" },
-									() => (
-										<>
-											<div class="mb-2 flex w-full items-center justify-end gap-3 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge">
-												<span class="text-label-muted">auto-submit</span>
-												<UiSwitch ariaLabel="Auto-submit" class="shrink-0" onChange={() => {}} />
-											</div>
-											<CurrentWord />
-											<div class="mt-4">
-												<Board />
-											</div>
-											<div class="mt-6 flex justify-center">
-												<SubmitButton />
-											</div>
-										</>
-									)
-								),
+								Match.when({ phase: "in-round" }, () => <GameBoard />),
 								Match.when({ phase: "between-rounds" }, () => <></>),
 								Match.exhaustive
 							),
