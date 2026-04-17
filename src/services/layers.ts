@@ -50,4 +50,4 @@ export const { gameContext } = await createGameSession()
 export const boardService = Context.get(gameContext, BoardService.BoardService)
 export const currentWordService = Context.get(gameContext, CurrentWordService)
 export const playerState = Context.get(gameContext, ClientPlayerState)
-export const currentGameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine)
+export const currentGameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine).atom

@@ -1,10 +1,10 @@
-import { GamePhase, type GameStateSnapshot } from "../../../services/GameStateMachine"
+import { GameMatchPhase, type GameStateSnapshot } from "../../../services/GameStateMachine"
 import { Switch } from "../../ui/switch"
 import Board from "./Board"
 import CurrentWord from "./CurrentWord"
 import PlayerScoreboard from "./PlayerScoreboard"
 import SubmitButton from "./SubmitButton"
-const board = <S extends GameStateSnapshot & { phase: typeof GamePhase.InRound }>(props: { state: S }) => {
+const board = <S extends GameStateSnapshot & { phase: typeof GameMatchPhase.InRound }>(props: { state: S }) => {
 	return (
 		<>
 			<PlayerScoreboard class="mb-2" />

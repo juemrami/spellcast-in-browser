@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-solid"
-import { AsyncResult } from "effect/unstable/reactivity"
+import { Match } from "effect"
 import { type Component, createMemo, For, splitProps } from "solid-js"
 import { currentGameStateMachine } from "../../../services/layers"
 
@@ -16,20 +16,16 @@ const PlayerScoreboard: Component<{ class?: string }> = (props) => {
 	const currentGame = useAtomValue(() => currentGameStateMachine)
 
 	const rows = createMemo(() => {
-		const result = AsyncResult.match(currentGame(), {
-			onSuccess: (r) => r.value,
-			onInitial: () => null,
-			onFailure: () => null
+		const result = Match.valueTags(currentGame(), {
+			Active: ({ snapshot }) => snapshot,
+			Crashed: (_) => null
 		})
 		if (!result) return []
-
 		const { players, rounds, currentRoundId } = result
 		const round = currentRoundId !== null
 			? rounds.find((r) => r.id === currentRoundId) ?? null
 			: null
-
 		const playersById = new Map(players.map((p) => [p.id, p]))
-
 		if (round) {
 			return round.turnOrder
 				.map((id, turnIndex) => {
@@ -43,7 +39,6 @@ const PlayerScoreboard: Component<{ class?: string }> = (props) => {
 				})
 				.filter((entry) => entry !== null)
 		}
-
 		return players.map((player, turnIndex) => ({ player, turnIndex, isActive: false }))
 	})
 

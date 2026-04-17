@@ -1,8 +1,8 @@
-import { Data, Effect, Layer, Option, pipe } from "effect"
+import { Effect, Layer, pipe } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
-import { type GameStateAction, GameStateMachine, isInRound } from "./GameStateMachine"
+import { GameAction, GameState, GameStateMachine } from "./GameStateMachine"
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	const rowDiff = Math.abs(tileA.row - tileB.row)
@@ -12,7 +12,8 @@ const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app/PlayerClientState", {
 	make: Effect.gen(function*() {
 		const selectionPath = Atom.make([] as Array<Tile>)
-		const currentGame = yield* GameStateMachine
+		const { atom: currentGame, dispatch: actionDispatch } = yield* GameStateMachine
+		const useActionResult = <T extends Atom.FnContext>(get: T) => get.result(actionDispatch)
 		const tryUpdateSelectionPath = Atom.fn(Effect.fn(function*(tile: Tile, get: Atom.FnContext) {
 			const path = get(selectionPath)
 			const tail = path.at(-1)
@@ -90,7 +91,6 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			ctx.set(playerMeta, meta)
 			ctx.setSelf(trimmedName)
 		})
-		const { joinLobby, startMatch, submitWord } = Data.taggedEnum<GameStateAction>()
 		const joinCurrentGameLobby = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			let meta = get(playerMeta)
 			const trimmedName = meta.name.trim()
@@ -99,54 +99,50 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				meta = { ...meta, name: newName }
 				get.set(playerMeta, meta)
 			}
-			get.set(currentGame, joinLobby({ player: meta }))
+			get.set(currentGame, GameAction.joinLobby({ player: meta }))
+			return yield* useActionResult(get)
 		}))
 		const playerId = Atom.readable((get) => get(playerMeta).id)
 		const startCurrentGame = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
-			const game = yield* get.result(currentGame)
+			const game = get(currentGame)
+			if (GameState.$is("Crashed")(game)) {
+				return false
+			}
 			get.set(
 				currentGame,
-				startMatch({
+				GameAction.startMatch({
 					matchId: crypto.randomUUID(),
-					round: {
-						startedAt: Date.now(),
+					roundConfig: {
 						durationMs: 120000,
-						turnOrder: game.players.map((player) => player.id),
-						boardSeed: crypto.randomUUID()
+						turnOrder: game.snapshot.players.map((player) => player.id)
+						// boardSeed: crypto.randomUUID() //todo
 					}
 				})
 			)
+			return yield* useActionResult(get)
 		}))
 		const submitSelectionPath = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			const path = get(selectionPath)
 			if (path.length === 0) return false
-			const recover = () => {
-				const result = get(currentGame)
-				if (result._tag === "Failure") {
-					const state = pipe(
-						result.previousSuccess,
-						Option.map((s) => s.value),
-						Option.filter((s) => isInRound(s)),
-						Option.getOrUndefined
-					)
-					if (state) {
-						return Effect.succeed(state)
-					}
-				}
-				return Effect.die("absurd")
-			}
-			const game = yield* (get.result(currentGame).pipe(
-				Effect.catchTag("InvalidWordSubmitted", recover),
-				Effect.catchTag("EmptyWordSubmitted", recover)
-			))
-			get.set(currentGame, submitWord({ path, playerId: get(playerId), roundId: game.currentRoundId ?? -1 }))
-			yield* get.result(currentGame).pipe(
-				Effect.catchTags({
-					"EmptyWordSubmitted": () => Effect.succeed(false),
-					"InvalidWordSubmitted": () => Effect.succeed(false)
-				})
+			return yield* pipe(
+				get(currentGame),
+				(game) =>
+					GameState.$is("Crashed")(game)
+						? Effect.succeed(false)
+						: pipe(
+							get.set(
+								currentGame,
+								GameAction.submitWord({ path, playerId: get(playerId), roundId: game.snapshot.currentRoundId ?? -1 })
+							),
+							() => useActionResult(get),
+							Effect.tapError(Effect.logError),
+							Effect.catchTags({
+								// todo: register errors with a toast atom backed system
+								"EmptyWordSubmitted": () => Effect.succeed(false),
+								"InvalidWordSubmitted": () => Effect.succeed(false)
+							})
+						)
 			)
-			return true
 		}))
 		return {
 			selectionPath,

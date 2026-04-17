@@ -1,25 +1,20 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-solid"
-import { Data } from "effect"
+import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-solid"
+import { Match } from "effect"
 import { AsyncResult } from "effect/unstable/reactivity"
-import { type Component, createEffect, createSignal, For } from "solid-js"
-import type { GameStateAction, GameStateSnapshot } from "../services/GameStateMachine"
+import { type Component, For } from "solid-js"
+import { GameAction } from "../services/GameStateMachine"
 import { boardService, currentGameStateMachine, playerState } from "../services/layers"
 
 const DeveloperPanel: Component = () => {
 	const regenerateBoard = useAtomSet(() => boardService.regenerateBoard)
-	const resetMatch = useAtomSet(() => currentGameStateMachine)
 	const clearSelectionPath = useAtomSet(() => playerState.clearSelectionPath)
-	const currentGame = useAtomValue(() => currentGameStateMachine)
-	const [matchState, setMatchState] = createSignal<GameStateSnapshot | undefined>()
-	createEffect(() =>
-		AsyncResult.match(currentGame(), {
-			onSuccess: (result) => setMatchState(result.value),
-			onInitial: () => setMatchState(),
-			onFailure: () => setMatchState()
+	const [currentGameState, reduceGameState] = useAtom(() => currentGameStateMachine)
+	const matchState = () =>
+		Match.valueTags(currentGameState(), {
+			Active: ({ snapshot }) => snapshot,
+			Crashed: (_) => undefined
 		})
-	)
 	const solutions = useAtomValue(() => boardService.boardSolutions)
-
 	const handleRegenerate = () => {
 		clearSelectionPath()
 		regenerateBoard()
@@ -50,8 +45,7 @@ const DeveloperPanel: Component = () => {
 				<button
 					type="button"
 					onClick={() => {
-						const { resetMatch: _resetMatch } = Data.taggedEnum<GameStateAction>()
-						resetMatch(_resetMatch())
+						reduceGameState(GameAction.resetMatch())
 					}}
 					class="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-shell bg-paper-50 px-3 py-1.5 text-xs font-semibold tracking-[0.12em] text-ink transition hover:bg-paper-200 active:bg-paper-200"
 				>
