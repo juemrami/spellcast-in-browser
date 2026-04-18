@@ -5,6 +5,7 @@ import { boardService, currentGameStateMachine } from "../services/layers"
 import DeveloperPanel from "./DeveloperPanel"
 import GameBoard from "./views/GameBoard"
 import Lobby from "./views/Lobby"
+import RoundSummary from "./views/RoundSummary"
 
 const GameLayout: Component = () => {
 	const tileCount = useAtomValue(() => boardService.tileCount)
@@ -50,7 +51,7 @@ const GameLayout: Component = () => {
 							Match.value(snapshot).pipe(
 								Match.when({ phase: "lobby" }, (state) => <Lobby players={state.players} />),
 								Match.when({ phase: "in-round" }, (state) => <GameBoard state={state} />),
-								Match.when({ phase: "between-rounds" }, () => <></>),
+								Match.when({ phase: "between-rounds" }, (state) => <RoundSummary state={state} />),
 								Match.exhaustive
 							),
 						Crashed: ({ cause: error }) => (

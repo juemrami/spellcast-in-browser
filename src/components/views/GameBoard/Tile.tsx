@@ -3,8 +3,8 @@ import type { Component } from "solid-js"
 import { useAtomSet, useAtomValue } from "@effect/atom-solid/Hooks"
 import { pipe } from "effect"
 import { Atom } from "effect/unstable/reactivity"
-import { boardService, playerState } from "../services/layers"
-import type { Tile, TileType } from "../types/game"
+import { boardService, playerState } from "../../../services/layers"
+import type { Tile, TileType } from "../../../types/game"
 
 const baseStyles: Record<TileType, string> = {
 	normal:

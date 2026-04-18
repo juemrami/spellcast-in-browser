@@ -1,4 +1,4 @@
-@reference "../../index.css";
+@reference "../../../index.css";
 @utility shadow-switch {
 	box-shadow:
 		inset 0 1px 0 color-mix(in srgb, var(--color-paper-50) 72%, transparent),

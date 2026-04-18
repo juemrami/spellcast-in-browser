@@ -1,7 +1,9 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { Match } from "effect"
 import { type Component, createMemo, For, splitProps } from "solid-js"
+import { GameMatchRound } from "../../../services/GameStateMachine"
 import { currentGameStateMachine } from "../../../services/layers"
+import TurnOrderBadge from "../../ui/TurnOrderBadge"
 
 // Ordered color palette for turn positions (rose, mint, sun, lavender)
 const TURN_COLORS: ReadonlyArray<{ bg: string; border: string; text: string; dot: string }> = [
@@ -26,7 +28,7 @@ const PlayerScoreboard: Component<{ class?: string }> = (props) => {
 			? rounds.find((r) => r.id === currentRoundId) ?? null
 			: null
 		const playersById = new Map(players.map((p) => [p.id, p]))
-		if (round) {
+		if (round && GameMatchRound.$is("InProgress")(round)) {
 			return round.turnOrder
 				.map((id, turnIndex) => {
 					const player = playersById.get(id)
@@ -58,14 +60,7 @@ const PlayerScoreboard: Component<{ class?: string }> = (props) => {
 							classList={{ "opacity-50": !entry.isActive, "opacity-100 shadow-sm": entry.isActive }}
 						>
 							<div class="min-w-0 flex w-max truncate text-sm font-semibold tracking-wide items-center space-x-1">
-								<div
-									style={{ "background-color": color.dot }}
-									class="h-3.5 w-4 rounded-full grid place-items-center"
-								>
-									<p class="text-xs text-white text-center font-bold align-middle text-tightest w-min max-w-[16ch] h-min mb-[1px]">
-										{entry.turnIndex + 1}
-									</p>
-								</div>
+								<TurnOrderBadge turnIndex={entry.turnIndex} dotColor={color.dot} />
 								<p class="text-tightest text-sm max-w-[12ch] text-ellipsis" title={entry.player.name}>
 									{entry.player.name}
 								</p>

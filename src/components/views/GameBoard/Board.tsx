@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { type Component, For } from "solid-js"
 import { boardService } from "../../../services/layers"
-import Tile from "../../Tile"
+import Tile from "./Tile"
 
 const Board: Component = () => {
 	const tiles = useAtomValue(() => boardService.boardTiles)

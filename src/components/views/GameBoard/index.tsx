@@ -1,5 +1,5 @@
 import { GameMatchPhase, type GameStateSnapshot } from "../../../services/GameStateMachine"
-import { Switch } from "../../ui/switch"
+import { Switch } from "../../ui/primitives/switch"
 import Board from "./Board"
 import CurrentWord from "./CurrentWord"
 import PlayerScoreboard from "./PlayerScoreboard"
