@@ -38,9 +38,9 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 	const startNextRound = useAtomSet(() => playerState.startCurrentGame)
 
 	const lastRound = createMemo(() => {
-		const { rounds, currentRoundId } = props.state
-		if (currentRoundId === null) return null
-		return rounds.find((r) => r.id === currentRoundId) ?? null
+		const { rounds, currentRound } = props.state
+		if (currentRound === null) return null
+		return rounds.find((r) => r.id === currentRound.id) ?? null
 	})
 
 	const playerEntries = createMemo(() => {
@@ -125,7 +125,7 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 									<Show
 										when={sortedWords.length > 0}
 										fallback={
-											<p class="rounded-lg bg-black/[0.06] px-2.5 py-1.5 text-[0.68rem] font-medium opacity-50">
+											<p class="rounded-lg bg-black/[0.06] px-2.5 py-1.5 text-[0.7rem] font-medium">
 												No words submitted this round
 											</p>
 										}
@@ -134,9 +134,17 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 											{(wordEntry) => (
 												<div class="flex items-center gap-2 rounded-lg bg-black/[0.06] px-2 py-1.5">
 													<div class="flex flex-wrap gap-[3px]">
-														<For each={wordEntry.path}>
-															{(tile) => <MiniTile tile={tile} />}
-														</For>
+														{wordEntry.word !== ""
+															? (
+																<For each={wordEntry.path}>
+																	{(tile) => <MiniTile tile={tile} />}
+																</For>
+															) :
+															(
+																<p class="text-[0.7rem] font-medium">
+																	No word submitted this round
+																</p>
+															)}
 													</div>
 												</div>
 											)}

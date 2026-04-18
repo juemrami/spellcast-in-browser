@@ -23,9 +23,9 @@ const PlayerScoreboard: Component<{ class?: string }> = (props) => {
 			Crashed: (_) => null
 		})
 		if (!result) return []
-		const { players, rounds, currentRoundId } = result
-		const round = currentRoundId !== null
-			? rounds.find((r) => r.id === currentRoundId) ?? null
+		const { players, rounds, currentRound } = result
+		const round = currentRound !== null
+			? rounds.find((r) => r.id === currentRound.id) ?? null
 			: null
 		const playersById = new Map(players.map((p) => [p.id, p]))
 		if (round && GameMatchRound.$is("InProgress")(round)) {
@@ -36,7 +36,7 @@ const PlayerScoreboard: Component<{ class?: string }> = (props) => {
 					return {
 						player,
 						turnIndex,
-						isActive: round.activePlayerId === id
+						isActive: round.currentTurn.playerId === id
 					}
 				})
 				.filter((entry) => entry !== null)

@@ -13,39 +13,37 @@ import * as GameStateMachine from "./GameStateMachine"
 import { ClientPlayerState } from "./PlayerState"
 import { WordList } from "./WordList"
 
-async function createGameSession() {
+const scope = Scope.makeUnsafe()
+const createGameSession = Effect.gen(function*() {
 	const memoMap = Layer.makeMemoMapUnsafe()
-	const AtomRegistryLayer = Layer.effect(
-		AtomRegistry.AtomRegistry,
-		Effect.succeed(useContext(RegistryContext))
-	)
-	const BoardLayer = Layer.provide(BoardService.live, WordList.layerWordnik)
-	const boardAtomRuntime = Atom.context({ memoMap })(
-		Layer.mergeAll(BoardLayer, AtomRegistryLayer)
-	)
-	const HostLayer = Layer.effect(
-		GameStateMachine.GameStateMachine,
-		GameStateMachine.make(boardAtomRuntime)
-	)
 
-	const GameLayer = pipe(
-		Layer.provideMerge(CurrentWordService.layer, BoardLayer),
-		Layer.provideMerge(ClientPlayerState.layerFresh),
-		Layer.provideMerge(HostLayer)
+	const BoardLayer = Layer.provide(BoardService.live, WordList.layerWordnik)
+	const atomRuntime = Atom.context({ memoMap })(BoardLayer)
+	const AtomRuntimeLayer = yield* Atom.get(atomRuntime.layer)
+
+	const makeStateMachine = pipe(
+		GameStateMachine.make(atomRuntime),
+		Effect.provideService(Scope.Scope, scope)
 	)
-	const scope = Scope.makeUnsafe()
+	const GameHostLayer = Layer.effect(GameStateMachine.GameStateMachine, makeStateMachine)
+	const GameLayer = pipe(
+		CurrentWordService.layer,
+		Layer.provideMerge(ClientPlayerState.layerFresh),
+		Layer.provideMerge(GameHostLayer),
+		Layer.provideMerge(AtomRuntimeLayer)
+	)
 	return {
 		memoMap: memoMap,
-		gameContext: await Effect.runPromise(Effect.gen(function*() {
-			return yield* Layer.buildWithMemoMap(GameLayer, memoMap, scope)
-		})),
+		gameContext: yield* Layer.buildWithMemoMap(GameLayer, memoMap, scope),
 		closeGame: () => {
 			Scope.close(scope, Exit.succeed(undefined))
 		}
 	}
-}
+}).pipe(
+	Effect.provideService(AtomRegistry.AtomRegistry, useContext(RegistryContext))
+)
 
-export const { gameContext } = await createGameSession()
+export const { gameContext } = await Effect.runPromise(createGameSession)
 
 export const boardService = Context.get(gameContext, BoardService.BoardService)
 export const currentWordService = Context.get(gameContext, CurrentWordService)

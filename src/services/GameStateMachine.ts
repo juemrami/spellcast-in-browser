@@ -1,5 +1,6 @@
-import { Context, Data, Effect, Match, pipe, Predicate, Random, Ref } from "effect"
+import { Context, Data, Duration, Effect, Match, pipe, Predicate, Random, Ref, Stream, Struct } from "effect"
 import type { HttpClientError } from "effect/unstable/http/HttpClientError"
+import type { AtomRegistry } from "effect/unstable/reactivity"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Path } from "../types/game"
 import * as BoardService from "./BoardService"
@@ -42,7 +43,7 @@ export interface LobbyPlayer {
 }
 
 export interface GameMatchRoundConfig {
-	readonly durationMs: number
+	readonly turnDurationMs: number
 	readonly turnOrder: ReadonlyArray<string>
 	// readonly boardSeed?: string | null // todo allow preseeding board for testing purposes
 }
@@ -56,24 +57,35 @@ export interface ScoreEntry {
 	readonly path: Path
 	readonly submittedAtMs: number
 }
-
+type BaseRound = {
+	readonly id: number
+	readonly startedAt: number
+	readonly turnOrder: ReadonlyArray<string>
+	readonly scores: ReadonlyArray<ScoreEntry>
+	readonly turnDuration: Duration.Duration
+}
 export type GameMatchRound = Data.TaggedEnum<{
-	InProgress: {
-		readonly id: number
-		readonly startedAt: number
-		readonly durationMs: number
-		readonly turnOrder: ReadonlyArray<string>
-		readonly activePlayerIndex: number
-		readonly activePlayerId: string
-		readonly scores: ReadonlyArray<ScoreEntry>
+	InProgress: BaseRound & {
+		readonly currentTurn: {
+			readonly playerId: string
+			readonly turnIndex: number
+			readonly endsAtMs: number
+		}
 	}
-	Ended: {
-		readonly id: number
-		readonly startedAt: number
+	BetweenTurns: BaseRound & {
+		readonly lastTurn: {
+			readonly playerId: string
+			readonly turnIndex: number
+			readonly score: ScoreEntry
+		}
+	}
+	Ended: BaseRound & {
 		readonly endedAt: number
-		readonly durationMs: number
-		readonly turnOrder: ReadonlyArray<string>
-		readonly scores: ReadonlyArray<ScoreEntry>
+		readonly lastTurn: {
+			readonly playerId: string
+			readonly turnIndex: number
+			readonly score: ScoreEntry
+		}
 	}
 }>
 export const GameMatchRound = Data.taggedEnum<GameMatchRound>()
@@ -86,9 +98,8 @@ export interface GameStateSnapshot {
 	readonly phase: GameMatchPhase
 	readonly players: ReadonlyArray<LobbyPlayer>
 	readonly rounds: ReadonlyArray<GameMatchRound>
-	readonly currentRoundId: number | null
+	readonly currentRound: GameMatchRound | null
 	readonly scoreLedger: ReadonlyArray<ScoreEntry>
-	readonly nextRoundId: number
 	readonly nextScoreEntryId: number
 }
 
@@ -102,7 +113,6 @@ export type GameState = Data.TaggedEnum<{
 }>
 export const GameState = Data.taggedEnum<GameState>()
 
-const { Active: makeActiveGameState, Crashed: makeCrashedGameState } = Data.taggedEnum<GameState>()
 const makeStateSnapshot = (
 	state: Omit<GameStateSnapshot, typeof GameStateSnapshotTypeId> | GameStateSnapshot
 ): GameStateSnapshot => ({
@@ -129,12 +139,12 @@ export type GameAction = Data.TaggedEnum<{
 		config: GameMatchRoundConfig
 	}
 	submitWord: {
-		roundId: number
 		playerId: string
 		path: Path
 	}
 	advanceTurn: {
 		reason: AdvanceTurnReason
+		playerId: string
 	}
 	endRound: {
 		roundId: number
@@ -174,16 +184,16 @@ export class InvalidActor extends Data.TaggedError("InvalidActor")<{
 	action: GameAction
 }> {}
 
+const omitTag = <T extends { _tag: string }>(obj: T): Omit<T, "_tag"> => Struct.omit(obj, ["_tag"])
 const createInitialSnapshot = (): GameStateSnapshot =>
 	makeStateSnapshot({
 		matchId: null,
 		startedAt: null,
 		phase: GameMatchPhase.InLobby,
+		currentRound: null,
 		players: [],
 		rounds: [],
-		currentRoundId: null,
 		scoreLedger: [],
-		nextRoundId: 1,
 		nextScoreEntryId: 1
 	})
 
@@ -230,23 +240,24 @@ const addNewRoundToSnapshot = Effect.fn(function*(
 			message: `Number of players in turn order does not match the number of valid players`
 		})
 	}
-	const rounds = yield* updateRounds(
-		GameMatchRound.InProgress({
-			id: state.nextRoundId,
-			startedAt: Date.now(),
-			durationMs: config.durationMs,
-			turnOrder,
-			activePlayerIndex: 0,
-			activePlayerId: turnOrder[0],
-			scores: []
-		}),
-		{ allowNew: true, skipRefUpdate: true }
-	)
-	return yield* updateSnapshot({
-		currentRoundId: state.nextRoundId,
-		nextRoundId: state.nextRoundId + 1,
-		rounds
+	const startedAt = Date.now()
+	const endsAt = startedAt + config.turnDurationMs
+	const newRound = GameMatchRound.InProgress({
+		id: state.rounds.length + 1, // 1 indexed ids
+		startedAt,
+		turnOrder,
+		turnDuration: Duration.millis(config.turnDurationMs),
+		currentTurn: {
+			playerId: turnOrder[0],
+			turnIndex: 0,
+			endsAtMs: endsAt
+		},
+		scores: []
 	})
+
+	const rounds = yield* updateRounds(newRound, { allowNew: true, skipRefUpdate: true })
+
+	return yield* updateSnapshot({ rounds, currentRound: newRound })
 })
 
 const updateRounds = Effect.fn(function*<R extends GameMatchRound>(
@@ -275,9 +286,7 @@ class StateSnapshotRef extends Context.Service<StateSnapshotRef, Ref.Ref<GameSta
 const getCurrentRound = Effect.gen(function*() {
 	const snapshot = yield* Ref.get(yield* StateSnapshotRef)
 	const action = yield* LastMachineAction
-	const round = snapshot.currentRoundId
-		? snapshot.rounds.find((round) => round.id === snapshot.currentRoundId) ?? null
-		: null
+	const round = snapshot.currentRound
 	if (!round) {
 		return yield* new CurrentRoundNotFound({
 			message: "Failed to find current round for game when performing action: " + action._tag,
@@ -296,16 +305,19 @@ const transitionToEndOfRound = Effect.gen(function*() {
 			state: snapshot
 		})
 	}
+	if (GameMatchRound.$is("InProgress")(currentRound)) {
+		return yield* new InvalidStateTransition({
+			message: "Cannot advance to end of round when current turn is still in progress",
+			action: yield* LastMachineAction,
+			state: snapshot
+		})
+	}
 	return yield* updateSnapshot({
 		phase: GameMatchPhase.BetweenRounds,
 		rounds: yield* updateRounds(
 			GameMatchRound.Ended({
-				id: currentRound.id,
-				durationMs: currentRound.durationMs,
-				startedAt: currentRound.startedAt,
-				endedAt: Date.now(),
-				turnOrder: currentRound.turnOrder,
-				scores: currentRound.scores
+				...omitTag(currentRound),
+				endedAt: Date.now()
 			}),
 			{ skipRefUpdate: true }
 		)
@@ -317,20 +329,29 @@ const transitionToNextPlayerTurn = Effect.gen(function*() {
 	const currentRound = yield* getCurrentRound
 	if (GameMatchRound.$is("Ended")(currentRound)) {
 		return yield* new RoundInactive({
-			message: "Cannot advance player turn when current round has ended ended",
+			message: "Cannot advance player turn when current round has already ended",
 			state: snapshot
 		})
 	}
-	const currentPlayer = currentRound.activePlayerIndex
-	const nextPlayerIdx = currentPlayer + 1
+	if (GameMatchRound.$is("InProgress")(currentRound)) {
+		return yield* new InvalidStateTransition({
+			message: "Cannot advance player turn when current turn is still in progress",
+			action: yield* LastMachineAction,
+			state: snapshot
+		})
+	}
+	const nextPlayerIdx = currentRound.lastTurn.turnIndex + 1
 	if (nextPlayerIdx >= currentRound.turnOrder.length) {
 		return yield* transitionToEndOfRound
 	}
 	const nextPlayerId = currentRound.turnOrder[nextPlayerIdx]
 	yield* updateRounds(GameMatchRound.InProgress({
-		...currentRound,
-		activePlayerIndex: nextPlayerIdx,
-		activePlayerId: nextPlayerId
+		...omitTag(currentRound),
+		currentTurn: {
+			playerId: nextPlayerId,
+			turnIndex: nextPlayerIdx,
+			endsAtMs: Date.now() + Duration.toMillis(currentRound.turnDuration)
+		}
 	}))
 })
 
@@ -348,9 +369,11 @@ const setPlayerRoundScore = Effect.fn(function*(
 	roundId: number,
 	path: Path
 ) {
-	const state = yield* Ref.get(yield* StateSnapshotRef)
+	const stateRef = yield* StateSnapshotRef
+	let state = yield* Ref.get(stateRef)
 	const board = yield* BoardService.BoardService
-	if (!state.rounds.find((round) => round.id === roundId)) {
+	const round = state.rounds.find((round) => round.id === roundId)
+	if (!round) {
 		return yield* new RoundInactive({
 			message: `Failed to find round with ID ${roundId} when setting player score for player ${playerId}`,
 			state
@@ -363,36 +386,44 @@ const setPlayerRoundScore = Effect.fn(function*(
 			action: yield* LastMachineAction
 		})
 	}
+	const word = path.map((node) => node.letter).join("")
+	const boardSolutions = yield* Atom.getResult(board.boardSolutions)
+	const validWord = boardSolutions.words.has(word)
 	const scoreEntry: ScoreEntry = {
 		id: `claim-${state.nextScoreEntryId}`,
 		playerId,
 		roundId,
-		points: path.reduce((score, pathNode) => score + board.getTileScore(pathNode), 0),
-		word: path.map((node) => node.letter).join(""),
+		points: validWord ? path.reduce((score, pathNode) => score + board.getTileScore(pathNode), 0) : 0,
+		word: validWord ? path.map((node) => node.letter).join("") : "",
 		path,
 		submittedAtMs: Date.now()
 	}
-	const nextRoundsState = [
-		...state.rounds.map((round) =>
-			round.id === roundId ?
-				{
-					...round,
-					scores: [...round.scores, scoreEntry]
-				} :
-				round
-		)
-	]
-	const nextPlayersState = [
-		...state.players.map((player) =>
-			player.id === playerId
-				? { ...player, score: player.score + scoreEntry.points }
-				: player
-		)
-	]
+	if (round.id === state.currentRound?.id) {
+		yield* Effect.log("Claiming score for current round", { scoreEntry })
+		yield* updateRounds(GameMatchRound.BetweenTurns({
+			...omitTag(round),
+			scores: [...round.scores, scoreEntry],
+			lastTurn: {
+				playerId,
+				turnIndex: playerIndex,
+				score: scoreEntry
+			}
+		}))
+	} else {
+		yield* updateRounds({
+			...round,
+			scores: [...round.scores, scoreEntry]
+		})
+	}
+	state = yield* Ref.get(stateRef) // latest state after round update
 	return yield* updateSnapshot({
-		...state,
-		rounds: nextRoundsState,
-		players: nextPlayersState,
+		players: [
+			...state.players.map((player) =>
+				player.id === playerId
+					? { ...player, score: player.score + scoreEntry.points }
+					: player
+			)
+		],
 		scoreLedger: [...state.scoreLedger, scoreEntry],
 		nextScoreEntryId: state.nextScoreEntryId + 1
 	})
@@ -496,12 +527,6 @@ export const reduceGameState = (
 								state
 							})
 						}
-						if (round.id !== submitAction.roundId) {
-							return yield* new RoundInactive({
-								message: "Cannot submit word for round that is not the current round",
-								state
-							})
-						}
 						if (!GameAction.$is("submitWord")(action)) {
 							return yield* new InvalidStateTransition({
 								message: "Cannot score submitted word when last machine action was not a word submission",
@@ -516,6 +541,12 @@ export const reduceGameState = (
 								message: "Cannot submit empty word"
 							})
 						}
+						const boardSolutions = yield* Atom.getResult(board.boardSolutions)
+						if (!boardSolutions.words.has(word)) {
+							return yield* new InvalidWordSubmitted({
+								message: `\"${word}\" is not a valid word for the current board`
+							})
+						}
 						if (state.players.find((player) => player.id === action.playerId) === undefined) {
 							return yield* new InvalidActor({
 								message: "Player submitting word is not part of the game",
@@ -524,7 +555,7 @@ export const reduceGameState = (
 						}
 						if (
 							state.scoreLedger.some((entry) =>
-								entry.roundId === action.roundId
+								entry.roundId === round.id
 								&& entry.playerId === action.playerId
 							)
 						) {
@@ -533,13 +564,7 @@ export const reduceGameState = (
 								action
 							})
 						}
-						const boardSolutions = yield* Atom.getResult(board.boardSolutions)
-						if (!boardSolutions.words.has(word)) {
-							return yield* new InvalidWordSubmitted({
-								message: `\"${word}\" is not a valid word for the current board`
-							})
-						}
-						yield* setPlayerRoundScore(action.playerId, action.roundId, action.path)
+						yield* setPlayerRoundScore(action.playerId, round.id, action.path)
 						yield* transitionToNextPlayerTurn
 						return yield* Ref.get(yield* StateSnapshotRef) // todo cleanup
 					}),
@@ -551,6 +576,47 @@ export const reduceGameState = (
 								action: turnAction,
 								state
 							})
+						}
+						const currentRound = yield* getCurrentRound
+						if (!GameMatchRound.$is("InProgress")(currentRound)) {
+							return yield* new RoundInactive({
+								message: "Cannot advance turn when turn is not in progress",
+								state
+							})
+						}
+						// maybe stale timer fired for a turn that already passed?
+						if (currentRound.currentTurn.playerId !== turnAction.playerId) {
+							return yield* new InvalidActor({
+								message: "Cannot advance turn for player who is not currently taking their turn",
+								action: turnAction
+							})
+						}
+						const hasCurrentPlayerScored = state.scoreLedger.some((entry) =>
+							entry.roundId === currentRound.id && entry.playerId === currentRound.currentTurn.playerId
+						)
+						if (!hasCurrentPlayerScored && turnAction.reason === AdvanceTurnReason.Timer) {
+							// auto-submit empty word for current player since their turn timer expired without a submission
+							const now = Date.now()
+							if (currentRound.currentTurn.endsAtMs > now) {
+								return yield* new InvalidStateTransition({
+									message:
+										"Cannot advance turn due to timer when current turn timer has not yet expired, use `manual` reason to force advance turn",
+									action: turnAction,
+									state
+								})
+							}
+							yield* Effect.log(
+								`Round timer ended for round ${currentRound.id}, transitioning to next turn/round`
+							)
+							yield* setPlayerRoundScore(
+								turnAction.playerId,
+								currentRound.id,
+								[] // empty path for timer submissions since there is no word
+							)
+						}
+						if (turnAction.reason === AdvanceTurnReason.Manual && !hasCurrentPlayerScored) {
+							// handle manual advance turn when current player has not scored
+							// todo: this seems dumb to expose
 						}
 						yield* transitionToNextPlayerTurn
 						return yield* Ref.get(yield* StateSnapshotRef) // todo cleanup
@@ -577,10 +643,15 @@ export const reduceGameState = (
 	})
 type FnRequirements<Fn extends (...args: any[]) => Effect.Effect<any, any, any>> = Effect.Services<ReturnType<Fn>>
 export const make = Effect.fn(
-	function*(runtime: Atom.AtomRuntime<FnRequirements<typeof reduceGameState>, HttpClientError>) {
+	function*(
+		runtime: Atom.AtomRuntime<
+			Exclude<FnRequirements<typeof reduceGameState>, AtomRegistry.AtomRegistry>,
+			HttpClientError
+		>
+	) {
 		const initialValue = createInitialSnapshot()
 		// todo: gameState should maybe not be initialized till the runtime is done (so that we have wordlist)
-		const gameState = Atom.make<GameState>(makeActiveGameState({ snapshot: initialValue }))
+		const gameState = Atom.make<GameState>(GameState.Active({ snapshot: initialValue }))
 		const reduceFn = runtime.fn(Effect.fn(function*(action: GameAction, get: Atom.FnContext) {
 			const current = get(gameState)
 			if (GameState.$is("Crashed")(current)) {
@@ -590,16 +661,65 @@ export const make = Effect.fn(
 				reduceGameState(current.snapshot, action),
 				Effect.map((nextSnapshot) => {
 					return current.snapshot !== nextSnapshot
-						? makeActiveGameState({ snapshot: nextSnapshot })
+						? GameState.Active({ snapshot: nextSnapshot })
 						: current
 				}),
 				Effect.catchTags({
-					"CurrentRoundNotFound": (cause) => Effect.succeed(makeCrashedGameState({ cause }))
+					"CurrentRoundNotFound": (cause) => Effect.succeed(GameState.Crashed({ cause }))
 				})
 			)
 			get.set(gameState, next)
 			return true
 		}))
+		type ActiveTurnGameState = GameState & {
+			_tag: "Active"
+			snapshot: {
+				phase: typeof GameMatchPhase.InRound
+				currentRound: {
+					_tag: "InProgress"
+				}
+			}
+		}
+		type IsActiveTurnStateRefinement = Predicate.Refinement<GameState, ActiveTurnGameState>
+		const isActiveTurnState: IsActiveTurnStateRefinement = (
+			state
+		): state is ActiveTurnGameState =>
+			Boolean(
+				GameState.$is("Active")(state) && state.snapshot.phase === GameMatchPhase.InRound &&
+					state.snapshot.currentRound && GameMatchRound.$is("InProgress")(state.snapshot.currentRound)
+			)
+			yield* pipe(
+				Atom.toStream(gameState),
+				Stream.changesWith((a, b) => {
+					if (!isActiveTurnState(a) || !isActiveTurnState(b)) return !isActiveTurnState(a) && !isActiveTurnState(b)
+						return a.snapshot.currentRound.currentTurn.endsAtMs === b.snapshot.currentRound.currentTurn.endsAtMs
+				}),
+				// auto-cancels previous timer via switchMap
+			Stream.switchMap((state) =>
+				Match.value(state).pipe(
+					Match.when(isActiveTurnState, ({ snapshot: { currentRound: { id, currentTurn } } }) =>
+						Stream.fromEffect(Effect.gen(function*() {
+							yield* Effect.log(
+								`Starting round ${id} timer for player ${currentTurn.playerId}. Turn ends at ${
+									new Date(currentTurn.endsAtMs).toLocaleTimeString()
+								}`
+							)
+							return yield* Effect.delay(
+								Atom.set(
+									reduceFn,
+									GameAction.advanceTurn({ reason: AdvanceTurnReason.Timer, playerId: currentTurn.playerId })
+								),
+								Duration.millis(currentTurn.endsAtMs - Date.now())
+							)
+						}))),
+					Match.orElse(() =>
+						Stream.empty
+					)
+				)
+			),
+			Stream.runDrain,
+			Effect.forkScoped
+		)
 		return {
 			atom: Atom.writable((get) => get(gameState), (ctx, action: GameAction) => ctx.set(reduceFn, action)),
 			dispatch: reduceFn

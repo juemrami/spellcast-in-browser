@@ -112,7 +112,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				currentGame,
 				GameAction.startRound({
 					config: {
-						durationMs: 120000,
+						turnDurationMs: 30000,
 						turnOrder: game.snapshot.players.map((player) => player.id)
 						// boardSeed: crypto.randomUUID() //todo
 					}
@@ -131,7 +131,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 						: pipe(
 							get.set(
 								currentGame,
-								GameAction.submitWord({ path, playerId: get(playerId), roundId: game.snapshot.currentRoundId ?? -1 })
+								GameAction.submitWord({ path, playerId: get(playerId) })
 							),
 							() => useActionResult(get),
 							Effect.tapError(Effect.logError),
@@ -160,14 +160,14 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				if (GameState.$is("Crashed")(game)) {
 					return false
 				}
-				const currentRound = game.snapshot.rounds.find((r) => r.id === game.snapshot.currentRoundId)
-				if (GameMatchRound.$is("Ended")(currentRound)) {
+				const currentRound = game.snapshot.rounds.find((r) => r.id === game.snapshot.currentRound?.id)
+				if (!GameMatchRound.$is("InProgress")(currentRound)) {
 					return false
 				}
 				if (!currentRound) {
 					return false
 				}
-				return currentRound.activePlayerId === get(playerId)
+				return currentRound.currentTurn.playerId === get(playerId)
 			})
 		}
 	})
