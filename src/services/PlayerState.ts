@@ -2,7 +2,7 @@ import { Effect, Layer, pipe } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
-import { GameAction, GameState, GameStateMachine } from "./GameStateMachine"
+import { GameAction, GameMatchRound, GameState, GameStateMachine } from "./GameStateMachine"
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	const rowDiff = Math.abs(tileA.row - tileB.row)
@@ -110,9 +110,8 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			}
 			get.set(
 				currentGame,
-				GameAction.startMatch({
-					matchId: crypto.randomUUID(),
-					roundConfig: {
+				GameAction.startRound({
+					config: {
 						durationMs: 120000,
 						turnOrder: game.snapshot.players.map((player) => player.id)
 						// boardSeed: crypto.randomUUID() //todo
@@ -128,7 +127,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				get(currentGame),
 				(game) =>
 					GameState.$is("Crashed")(game)
-						? Effect.succeed(false)
+						? Effect.die(new Error("Cannot submit word when game is crashed", { cause: game.cause }))
 						: pipe(
 							get.set(
 								currentGame,
@@ -155,7 +154,21 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			},
 			joinCurrentGameLobby,
 			startCurrentGame,
-			submitSelectionPath
+			submitSelectionPath,
+			isPlayerTurn: Atom.make((get) => {
+				const game = get(currentGame)
+				if (GameState.$is("Crashed")(game)) {
+					return false
+				}
+				const currentRound = game.snapshot.rounds.find((r) => r.id === game.snapshot.currentRoundId)
+				if (GameMatchRound.$is("Ended")(currentRound)) {
+					return false
+				}
+				if (!currentRound) {
+					return false
+				}
+				return currentRound.activePlayerId === get(playerId)
+			})
 		}
 	})
 }) {
