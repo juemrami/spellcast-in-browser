@@ -2,7 +2,7 @@ import { Effect, Layer, pipe } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
-import { GameAction, GameMatchRound, GameState, GameStateMachine } from "./GameStateMachine"
+import { GameMatchAction, GameState, GameStateMachine, isActiveTurnState } from "./GameStateMachine"
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	const rowDiff = Math.abs(tileA.row - tileB.row)
@@ -99,7 +99,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				meta = { ...meta, name: newName }
 				get.set(playerMeta, meta)
 			}
-			get.set(currentGame, GameAction.joinLobby({ player: meta }))
+			get.set(currentGame, GameMatchAction.joinLobby({ player: meta }))
 			return yield* useActionResult(get)
 		}))
 		const playerId = Atom.readable((get) => get(playerMeta).id)
@@ -110,7 +110,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			}
 			get.set(
 				currentGame,
-				GameAction.startRound({
+				GameMatchAction.startRound({
 					config: {
 						turnDurationMs: 30000,
 						turnOrder: game.snapshot.players.map((player) => player.id)
@@ -131,7 +131,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 						: pipe(
 							get.set(
 								currentGame,
-								GameAction.submitWord({ path, playerId: get(playerId) })
+								GameMatchAction.submitWord({ path, playerId: get(playerId) })
 							),
 							() => useActionResult(get),
 							Effect.tapError(Effect.logError),
@@ -157,17 +157,8 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			submitSelectionPath,
 			isPlayerTurn: Atom.make((get) => {
 				const game = get(currentGame)
-				if (GameState.$is("Crashed")(game)) {
-					return false
-				}
-				const currentRound = game.snapshot.rounds.find((r) => r.id === game.snapshot.currentRound?.id)
-				if (!GameMatchRound.$is("InProgress")(currentRound)) {
-					return false
-				}
-				if (!currentRound) {
-					return false
-				}
-				return currentRound.currentTurn.playerId === get(playerId)
+				if (!isActiveTurnState(game)) return false
+				return game.snapshot.currentRound.currentTurn.playerId === get(playerId)
 			})
 		}
 	})

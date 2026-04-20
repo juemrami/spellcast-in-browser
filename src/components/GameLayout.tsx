@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { Match } from "effect"
 import { type Component, createSignal, Show } from "solid-js"
+import { GameMatchState } from "../services/GameStateMachine"
 import { boardService, currentGameStateMachine } from "../services/layers"
 import DeveloperPanel from "./DeveloperPanel"
 import GameBoard from "./views/GameBoard"
@@ -48,12 +49,12 @@ const GameLayout: Component = () => {
 				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-4 shadow-panel-hero sm:p-6">
 					{Match.valueTags(currentGame(), {
 						Active: ({ snapshot }) =>
-							Match.value(snapshot).pipe(
-								Match.when({ phase: "lobby" }, (state) => <Lobby players={state.players} />),
-								Match.when({ phase: "in-round" }, (state) => <GameBoard state={state} />),
-								Match.when({ phase: "between-rounds" }, (state) => <RoundSummary state={state} />),
-								Match.exhaustive
-							),
+							GameMatchState.$match(snapshot, {
+								InLobby: (state) => <Lobby players={state.players} />,
+								InRound: (state) => <GameBoard state={state} />,
+								BetweenRounds: (state) => <RoundSummary state={state} />,
+								MatchRecap: (state) => <RoundSummary state={state} />
+							}),
 						Crashed: ({ cause: error }) => (
 							<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-red-500">
 								Failed to load game state.

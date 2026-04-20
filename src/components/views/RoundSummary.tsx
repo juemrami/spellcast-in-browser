@@ -1,6 +1,7 @@
 import { useAtomSet } from "@effect/atom-solid"
-import { type Component, createMemo, For, Show } from "solid-js"
-import { GameMatchPhase, type GameStateSnapshot, type ScoreEntry } from "../../services/GameStateMachine"
+import type { Data } from "effect"
+import { type Component, For, Show } from "solid-js"
+import type { GameMatchState, ScoreEntry } from "../../services/GameStateMachine"
 import { playerState } from "../../services/layers"
 import type { Tile } from "../../types/game"
 import TurnOrderBadge from "../ui/TurnOrderBadge"
@@ -32,19 +33,14 @@ const MiniTile: Component<{ tile: Tile }> = (props) => (
 	</div>
 )
 
-type RoundSummaryState = GameStateSnapshot & { phase: typeof GameMatchPhase.BetweenRounds }
+type RoundSummaryState = Data.TaggedEnum.Value<GameMatchState, "BetweenRounds" | "MatchRecap">
 
 const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 	const startNextRound = useAtomSet(() => playerState.startCurrentGame)
 
-	const lastRound = createMemo(() => {
-		const { rounds, currentRound } = props.state
-		if (currentRound === null) return null
-		return rounds.find((r) => r.id === currentRound.id) ?? null
-	})
-
-	const playerEntries = createMemo(() => {
-		const round = lastRound()
+	const lastRound = props.state.lastRound
+	const playerEntries = (() => {
+		const round = lastRound
 		const { players } = props.state
 		const turnOrder = round ? [...round.turnOrder] : players.map((p) => p.id)
 		const playersById = new Map(players.map((p) => [p.id, p]))
@@ -66,13 +62,13 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 				return { player, turnIndex, words, roundPoints }
 			})
 			.filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-	})
+	})()
 
 	return (
 		<div class="flex w-full flex-col items-center gap-5">
 			<div class="flex flex-col items-center gap-1">
 				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.45em] text-label-muted">
-					Round {lastRound()?.id ?? "—"} complete
+					Round {lastRound.id} complete
 				</p>
 				<h2 class="font-display text-[1.6rem] font-bold leading-tight tracking-wide text-header">
 					Results
@@ -80,7 +76,7 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 			</div>
 
 			<div class="flex w-full flex-col gap-3">
-				<For each={playerEntries()}>
+				<For each={playerEntries}>
 					{(entry) => {
 						const color = TURN_COLORS[entry.turnIndex % TURN_COLORS.length]
 						const sortedWords = [...entry.words].sort((a, b) => b.points - a.points)

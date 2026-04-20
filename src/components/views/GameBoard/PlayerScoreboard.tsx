@@ -1,7 +1,6 @@
 import { useAtomValue } from "@effect/atom-solid"
-import { Match } from "effect"
 import { type Component, createMemo, For, splitProps } from "solid-js"
-import { GameMatchRound } from "../../../services/GameStateMachine"
+import { GameMatchState, GameState, MatchRoundState } from "../../../services/GameStateMachine"
 import { currentGameStateMachine } from "../../../services/layers"
 import TurnOrderBadge from "../../ui/TurnOrderBadge"
 
@@ -18,30 +17,24 @@ const PlayerScoreboard: Component<{ class?: string }> = (props) => {
 	const currentGame = useAtomValue(() => currentGameStateMachine)
 
 	const rows = createMemo(() => {
-		const result = Match.valueTags(currentGame(), {
-			Active: ({ snapshot }) => snapshot,
-			Crashed: (_) => null
-		})
-		if (!result) return []
-		const { players, rounds, currentRound } = result
-		const round = currentRound !== null
-			? rounds.find((r) => r.id === currentRound.id) ?? null
-			: null
+		const game = currentGame()
+		if (
+			!GameState.$is("Active")(game) || !GameMatchState.$is("InRound")(game.snapshot) ||
+			!MatchRoundState.$is("InProgress")(game.snapshot.currentRound)
+		) return []
+		const { players, currentRound } = game.snapshot
 		const playersById = new Map(players.map((p) => [p.id, p]))
-		if (round && GameMatchRound.$is("InProgress")(round)) {
-			return round.turnOrder
-				.map((id, turnIndex) => {
-					const player = playersById.get(id)
-					if (!player) return null
-					return {
-						player,
-						turnIndex,
-						isActive: round.currentTurn.playerId === id
-					}
-				})
-				.filter((entry) => entry !== null)
-		}
-		return players.map((player, turnIndex) => ({ player, turnIndex, isActive: false }))
+		return currentRound.turnOrder
+			.map((id, turnIndex) => {
+				const player = playersById.get(id)
+				if (!player) return null
+				return {
+					player,
+					turnIndex,
+					isActive: currentRound.currentTurn.playerId === id
+				}
+			})
+			.filter((entry) => entry !== null)
 	})
 
 	return (

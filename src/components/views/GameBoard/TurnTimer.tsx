@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { Duration } from "effect"
 import { type ComponentProps, createMemo, createSignal, onCleanup, Show, splitProps } from "solid-js"
-import { GameMatchPhase, GameMatchRound, GameState } from "../../../services/GameStateMachine"
+import { isActiveTurnState } from "../../../services/GameStateMachine"
 import { currentGameStateMachine, playerState } from "../../../services/layers"
 
 const CurrentTurnTimer = (props: ComponentProps<"div">) => {
@@ -14,12 +14,7 @@ const CurrentTurnTimer = (props: ComponentProps<"div">) => {
 	onCleanup(() => clearInterval(interval))
 	const turnInfo = createMemo(() => {
 		const state = gameState()
-		if (
-			GameState.$is("Active")(state) &&
-			state.snapshot.phase === GameMatchPhase.InRound &&
-			state.snapshot.currentRound &&
-			GameMatchRound.$is("InProgress")(state.snapshot.currentRound)
-		) {
+		if (isActiveTurnState(state)) {
 			const { endsAtMs } = state.snapshot.currentRound.currentTurn
 			const totalMs = Duration.toMillis(state.snapshot.currentRound.turnDuration)
 			return { endsAtMs, totalMs }

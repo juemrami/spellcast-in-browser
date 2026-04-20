@@ -1,11 +1,14 @@
-import { GameMatchPhase, type GameStateSnapshot } from "../../../services/GameStateMachine"
+import type { Data } from "effect"
+import type { GameMatchState } from "../../../services/GameStateMachine"
 import { Switch } from "../../ui/primitives/switch"
 import Board from "./Board"
 import CurrentWord from "./CurrentWord"
 import PlayerScoreboard from "./PlayerScoreboard"
 import SubmitButton from "./SubmitButton"
 import TurnTimer from "./TurnTimer"
-const board = <S extends GameStateSnapshot & { phase: typeof GameMatchPhase.InRound }>(props: { state: S }) => {
+
+// oxlint-disable-next-line no-unused-vars
+const board = (props: { state: Data.TaggedEnum.Value<GameMatchState, "InRound"> }) => {
 	return (
 		<>
 			<PlayerScoreboard class="mb-2" />
