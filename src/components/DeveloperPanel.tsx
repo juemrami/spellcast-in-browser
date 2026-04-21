@@ -6,7 +6,7 @@ import { GameMatchAction, GameMatchState } from "../services/GameStateMachine"
 import { boardService, currentGameStateMachine, playerState } from "../services/layers"
 
 const DeveloperPanel: Component = () => {
-	const regenerateBoard = useAtomSet(() => boardService.regenerateBoard)
+	const regenerateBoard = useAtomSet(() => boardService.atoms.regenerateBoard)
 	const clearSelectionPath = useAtomSet(() => playerState.clearSelectionPath)
 	const [currentGameState, reduceGameState] = useAtom(() => currentGameStateMachine)
 	const matchState = () =>
@@ -14,7 +14,7 @@ const DeveloperPanel: Component = () => {
 			Active: ({ snapshot }) => snapshot,
 			Crashed: (_) => undefined
 		})
-	const solutions = useAtomValue(() => boardService.boardSolutions)
+	const solutions = useAtomValue(() => boardService.atoms.boardSolutions)
 	const handleRegenerate = () => {
 		clearSelectionPath()
 		regenerateBoard()

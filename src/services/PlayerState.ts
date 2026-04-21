@@ -163,8 +163,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			const enabled = get(autoSubmitOnValidPath)
 			if (!enabled) return
 			const currentPath = get(selectionPath)
-			get.set(isValidPath, currentPath)
-			const valid = yield* get.result(isValidPath)
+			const valid = yield* isValidPath(currentPath)
 			if (valid) {
 				get.set(submitSelectionPath, void 0)
 				yield* get.result(submitSelectionPath)

@@ -556,7 +556,7 @@ export const reduceGameState = (
 								message: "Cannot submit empty word"
 							})
 						}
-						const boardSolutions = yield* Atom.getResult(board.boardSolutions)
+						const boardSolutions = yield* board.boardSolutions
 						if (!boardSolutions.words.has(submittedWord)) {
 							return yield* new InvalidWordSubmitted({
 								message: `"${submittedWord}" is not a valid word for the current board`

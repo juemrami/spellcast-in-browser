@@ -35,7 +35,7 @@ export const make = Effect.gen(function*() {
 	const player = yield* ClientPlayerState
 
 	const currentWord = Atom.make((ctx) => {
-		const tiles = ctx.get(board.boardTiles)
+		const tiles = ctx.get(board.atoms.board)
 		const playerSelectionPath = ctx.get(player.selectionPath)
 		const selectedTiles = playerSelectionPath.map((selected) =>
 			tiles.find((tile) => tile.row === selected.row && tile.col === selected.col)
@@ -48,7 +48,7 @@ export const make = Effect.gen(function*() {
 	const isCurrentWordValid = Atom.make((get) =>
 		Effect.gen(function*() {
 			const currentWordValue = get(currentWord)
-			const solution = yield* get.result(board.boardSolutions)
+			const solution = yield* get.result(board.atoms.boardSolutions)
 			return isValidWord(currentWordValue, solution.words)
 		})
 	)

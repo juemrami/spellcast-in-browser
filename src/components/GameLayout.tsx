@@ -2,14 +2,14 @@ import { useAtomValue } from "@effect/atom-solid"
 import { Match } from "effect"
 import { type Component, createSignal, Show } from "solid-js"
 import { GameMatchState } from "../services/GameStateMachine"
-import { boardService, currentGameStateMachine } from "../services/layers"
+import { currentGameStateMachine } from "../services/layers"
 import DeveloperPanel from "./DeveloperPanel"
 import GameBoard from "./views/GameBoard"
 import Lobby from "./views/Lobby"
 import RoundSummary from "./views/RoundSummary"
 
 const GameLayout: Component = () => {
-	const tileCount = useAtomValue(() => boardService.tileCount)
+	// const tileCount = useAtomValue(() => boardService.atoms.tileCount)
 	const [isDeveloperPanelOpen, setDeveloperPanelOpen] = createSignal(false)
 	const currentGame = useAtomValue(() => currentGameStateMachine)
 
@@ -39,12 +39,14 @@ const GameLayout: Component = () => {
 					<p class="text-3xl font-semibold uppercase tracking-[0.55em] text-label">
 						BoggleCast
 					</p>
-					<div class="inline-flex items-center gap-2 rounded-full border border-shell bg-paper-50/82 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge shadow-pill backdrop-blur">
+					{
+						/* <div class="inline-flex items-center gap-2 rounded-full border border-shell bg-paper-50/82 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge shadow-pill backdrop-blur">
 						<span>{tileCount()}</span>
 						<span class="text-label-muted">letters</span>
 						<span class="text-label-faint">•</span>
 						<span>puzzle</span>
-					</div>
+					</div> */
+					}
 				</header>
 				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-2 shadow-panel-hero sm:p-4">
 					{Match.valueTags(currentGame(), {

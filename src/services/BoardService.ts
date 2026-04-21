@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Atom from "effect/unstable/reactivity/Atom"
 
+import { Ref } from "effect"
 import { pipe } from "effect/Function"
 import { toUpperCase } from "effect/String"
 import { BOARD_SIZE, type Tile } from "../types/game"
@@ -62,15 +63,32 @@ export const make = Effect.gen(function*() {
 	const genNewBoard = boardGenerator.generate(BOARD_SIZE, {
 		maxOccurrencesPerLetter: 4,
 		minAvgWordLength: 4.5,
-		minWordLength: 3
+		minWordLength: 2
 	})
-	const generation = yield* genNewBoard
-	const lastGeneration = Atom.make(generation)
-	const boardTiles = Atom.make((get) => get(lastGeneration).board)
-	const tileCount = Atom.make((get) => get(lastGeneration).board.length)
-	const regenerateBoard = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
-		get.set(lastGeneration, yield* genNewBoard)
-	}))
+	const generationRef = yield* Ref.make(yield* genNewBoard)
+	const generationAtom = Atom.make(yield* Ref.get(generationRef))
+	const regenerateBoard = Effect.gen(function*() {
+		const newBoard = yield* genNewBoard
+		yield* Ref.set(generationRef, newBoard)
+		yield* Atom.set(generationAtom, newBoard)
+	})
+	const boardSolutions = Ref.get(generationRef).pipe(Effect.map((board) => board.solutions))
+	const isValidPath = Effect.fn(function*(path: Array<Tile>) {
+		const solutions = yield* boardSolutions
+		// validate that the path tiles exists and the letter match
+		for (const tile of path) {
+			const boardTiles = yield* Ref.get(generationRef).pipe(Effect.map((board) => board.board))
+			const matchingTile = boardTiles.find((t) => t.col === tile.col && t.row === tile.row)
+			if (!matchingTile || matchingTile.letter !== tile.letter) {
+				return false
+			}
+		}
+		const word = path.map((t) => t.letter).join("").toLowerCase()
+		if (!solutions.words.has(word)) {
+			return false
+		}
+		return true
+	})
 	const getTileScore = (tile: Tile) => {
 		if (scoringType === "word-length") {
 			// eslint-disable-next-line no-console
@@ -80,21 +98,24 @@ export const make = Effect.gen(function*() {
 		const letterScoreLookup = letterPointScoreLookup[scoringMethod]
 		return letterScoreLookup[toUpperCase(tile.letter)] || 0
 	}
-	const boardSolutions = Atom.make(Effect.fn(function*(get) {
-		return get(lastGeneration).solutions
-	})).pipe(Atom.keepAlive)
-	const isValidPath = Atom.fn(Effect.fn(function*(path: Tile[], get: Atom.FnContext) {
-		const solutions = yield* get.result(boardSolutions)
-		const word = path.map((t) => t.letter).join("")
-		return solutions.words.has(word.toLocaleLowerCase())
-	}))
+
+	const boardAtom = Atom.make((get) => get(generationAtom).board)
+	const tileCountAtom = Atom.make((get) => get(generationAtom).board.length)
+	const regenerateBoardAtom = Atom.fn(() => regenerateBoard)
+	const boardSolutionsAtom = Atom.make((get) => get(generationAtom).solutions).pipe(Atom.keepAlive)
+	const isValidPathAtom = Atom.fn(isValidPath)
 	return {
-		boardTiles,
-		tileCount,
-		getTileScore,
 		regenerateBoard,
 		boardSolutions,
-		isValidPath
+		getTileScore,
+		isValidPath,
+		atoms: {
+			regenerateBoard: regenerateBoardAtom,
+			boardSolutions: boardSolutionsAtom,
+			board: boardAtom,
+			isValidPath: isValidPathAtom,
+			tileCount: tileCountAtom
+		}
 	}
 })
 export class BoardService extends Context.Service<BoardService, Effect.Success<typeof make>>()("host/BoardService") {}
