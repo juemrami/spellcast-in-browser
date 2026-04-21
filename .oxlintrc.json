@@ -15,11 +15,11 @@
 	},
 	// note: oxclint automatically ignores .gitignore'd globs
 	"ignorePatterns": [
-		".jj",
-		".agents",
-		"**/docs",
-		"data/**",
-		"**.png",
+		// ".jj",
+		// ".agents",
+		// "**/docs",
+		// "data/**",
+		// "**.png",
 	],
 	"jsPlugins": [
 		"./oxlint/effect/index.ts"

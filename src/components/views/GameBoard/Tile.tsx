@@ -22,7 +22,7 @@ const getTileStyles = (type: TileType, selected: boolean): string => {
 	return baseStyles[type]
 }
 
-const getScoreChipStyles = (score: number): string => {
+const getScoreChipStyles = (_score: number): string => {
 	return "text-ink"
 }
 

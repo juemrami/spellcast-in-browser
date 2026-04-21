@@ -68,7 +68,7 @@ export class LetterFrequencyAnalyzer extends Context.Service<LetterFrequencyAnal
 				if (!isEnglishLetter(letter)) continue // skip words with non english characters
 				localFreqs[letter] = (localFreqs[letter] || 0) + 1
 			}
-			for (const letter of (word as unknown as EnglishLetterLower[])) {
+			for (const letter of (word as unknown as Array<EnglishLetterLower>)) {
 				letterFrequency[letter] = (letterFrequency[letter] || 0) + localFreqs[letter]!
 			}
 		}
@@ -85,9 +85,9 @@ export class LetterFrequencyAnalyzer extends Context.Service<LetterFrequencyAnal
 			})
 			return normalized
 		})
-		const distributedAlphabet = ENGLISH_ALPHABET_LOWER.map((letter) =>
+		const distributedAlphabet = ENGLISH_ALPHABET_LOWER.flatMap((letter) =>
 			Array<EnglishLetterLower>(normalizedLetterFrequencies[letter] || 0).fill(letter)
-		).flat()
+		)
 		return {
 			frequencies: {
 				unigram: letterFrequency
