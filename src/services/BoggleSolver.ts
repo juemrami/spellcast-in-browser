@@ -1,8 +1,14 @@
-import { Cache, Context, Effect, Layer } from "effect"
+import { Cache, Context, Effect, Layer, Struct } from "effect"
 import type { Board, Path, Tile } from "../types/game"
 import { type TrieNode, UnigramTrie } from "./Trie"
 import { WordList } from "./WordList"
-
+const SOLUTION_OPTIONS_DEFAULT = {
+	minWordLength: 1
+}
+type SolutionOptions = typeof SOLUTION_OPTIONS_DEFAULT
+type PartialOptional<T extends {}> = {
+	[P in keyof T]?: T[P] | undefined
+}
 const getTileNeighbors = (tile: Tile, board: Board): Array<Tile> => {
 	const neighbors: Array<Tile> = []
 	for (let rowOffset = -1; rowOffset <= 1; rowOffset++) {
@@ -22,18 +28,19 @@ const dfs = (
 	trie: TrieNode,
 	path: Array<Tile>,
 	visited: Map<string, boolean>,
-	results: Array<Array<Tile>>
+	results: Array<Array<Tile>>,
+	options: SolutionOptions
 ) => {
 	const trieNode = trie.children.get(tile.letter.toLowerCase())
 	if (!trieNode) return // prune if no words start with the current path
 	visited.set(`${tile.row},${tile.col}`, true)
 	path.push(tile)
-	if (trieNode.isEndOfWord) results.push(path)
+	if (trieNode.isEndOfWord && (path.length >= options.minWordLength)) results.push(path)
 	const neighbors = getTileNeighbors(tile, board)
 	for (const neighbor of neighbors) {
 		if (!visited.get(`${neighbor.row},${neighbor.col}`)) {
 			// note: make sure `path` is not a reference to the same array in different recursive calls
-			dfs(board, neighbor, trieNode!, [...path], visited, results)
+			dfs(board, neighbor, trieNode!, [...path], visited, results, options)
 		}
 	}
 	visited.set(`${tile.row},${tile.col}`, false) // backtrack -- same tile can be used in different paths
@@ -53,11 +60,11 @@ export class BoggleSolver extends Context.Service<BoggleSolver>()(
 				capacity: 10_000,
 				lookup: (key: string) =>
 					Effect.sync(() => {
-						const board: Board = JSON.parse(key)
+						const { board, options }: { board: Board; options: SolutionOptions } = JSON.parse(key)
 						const results: Array<Path> = []
 						const visited = new Map<string, boolean>()
 						for (const tile of board) {
-							dfs(board, tile, trie.root, [], visited, results)
+							dfs(board, tile, trie.root, [], visited, results, options)
 						}
 						return {
 							paths: results,
@@ -66,8 +73,22 @@ export class BoggleSolver extends Context.Service<BoggleSolver>()(
 					})
 			})
 			return {
-				solve: Effect.fn(function*(board: Board) {
-					const key = JSON.stringify(board)
+				solve: Effect.fn(function*(
+					board: Board,
+					options?: PartialOptional<SolutionOptions>
+				) {
+					if (!options) options = SOLUTION_OPTIONS_DEFAULT
+					else {
+						for (const key of Struct.keys(SOLUTION_OPTIONS_DEFAULT)) {
+							if (options[key] === undefined) {
+								options[key] = SOLUTION_OPTIONS_DEFAULT[key]
+							}
+						}
+					}
+					const key = JSON.stringify({
+						board,
+						options
+					})
 					return yield* Cache.get(solutionCache, key)
 				}),
 				analyzeSolution: Effect.fn(function*(solution: BoggleSolutions) {

@@ -11,6 +11,7 @@ const make = Effect.gen(function*() {
 			maxOccurrencesPerLetter?: number
 			maxGenAttempts?: number
 			minAvgWordLength?: number
+			minWordLength?: number
 			/** Inclusive range */
 			totalWordsRange?: [min: number, max: number]
 		} = {}) {
@@ -38,7 +39,9 @@ const make = Effect.gen(function*() {
 						console.warn("Max board generation attempts reached")
 						break
 					}
-					const solutions = yield* solver.solve(board)
+					const solutions = yield* solver.solve(board, {
+						minWordLength: options.minWordLength
+					})
 					const solutionMeta = yield* solver.analyzeSolution(solutions)
 					const avgWordLength = solutionMeta.avgWordLength
 					const totalWords = solutionMeta.totalWords
@@ -63,7 +66,9 @@ const make = Effect.gen(function*() {
 			}
 			return {
 				board,
-				solutions: yield* solver.solve(board)
+				solutions: yield* solver.solve(board, {
+					minWordLength: options.minWordLength
+				})
 			}
 		})
 	}

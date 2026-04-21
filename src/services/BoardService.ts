@@ -61,7 +61,8 @@ export const make = Effect.gen(function*() {
 	const boardGenerator = yield* BoardGenerator
 	const genNewBoard = boardGenerator.generate(BOARD_SIZE, {
 		maxOccurrencesPerLetter: 4,
-		minAvgWordLength: 4.5
+		minAvgWordLength: 4.5,
+		minWordLength: 3
 	})
 	const generation = yield* genNewBoard
 	const lastGeneration = Atom.make(generation)
