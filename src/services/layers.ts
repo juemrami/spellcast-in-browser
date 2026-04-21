@@ -8,7 +8,7 @@ import { pipe } from "effect/Function"
 import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
 import * as BoardService from "./BoardService"
-import { CurrentWordService } from "./CurrentWordService"
+import { PlayerCurrentWordAtoms } from "./PlayerCurrentWordAtoms"
 import * as GameStateMachine from "./GameStateMachine"
 import { ClientPlayerState } from "./PlayerState"
 import { WordList } from "./WordList"
@@ -27,7 +27,7 @@ const createGameSession = Effect.gen(function*() {
 	)
 	const GameHostLayer = Layer.effect(GameStateMachine.GameStateMachine, makeStateMachine)
 	const GameLayer = pipe(
-		CurrentWordService.layer,
+		PlayerCurrentWordAtoms.layer,
 		Layer.provideMerge(ClientPlayerState.layerFresh),
 		Layer.provideMerge(GameHostLayer),
 		Layer.provideMerge(AtomRuntimeLayer)
@@ -46,6 +46,6 @@ const createGameSession = Effect.gen(function*() {
 export const { gameContext } = await Effect.runPromise(createGameSession)
 
 export const boardService = Context.get(gameContext, BoardService.BoardService)
-export const currentWordService = Context.get(gameContext, CurrentWordService)
+export const currentWordService = Context.get(gameContext, PlayerCurrentWordAtoms)
 export const playerState = Context.get(gameContext, ClientPlayerState)
 export const currentGameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine).atom
