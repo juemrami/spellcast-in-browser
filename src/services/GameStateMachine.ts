@@ -1,6 +1,21 @@
-import { Context, Data, Duration, Effect, Match, pipe, type Predicate, Random, Ref, Stream, Struct } from "effect"
+import {
+	Context,
+	Data,
+	Duration,
+	Effect,
+	Match,
+	pipe,
+	type Predicate,
+	Random,
+	Ref,
+	Schema,
+	SchemaGetter,
+	Stream,
+	Struct
+} from "effect"
 import type { TaggedEnum } from "effect/Data"
 import type { HttpClientError } from "effect/unstable/http/HttpClientError"
+import type { KeyValueStore } from "effect/unstable/persistence"
 import type { AtomRegistry } from "effect/unstable/reactivity"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Path } from "../types/game"
@@ -675,13 +690,29 @@ type FnRequirements<Fn extends (...args: Array<any>) => Effect.Effect<any, any, 
 export const make = Effect.fn(
 	function*(
 		runtime: Atom.AtomRuntime<
-			Exclude<FnRequirements<typeof reduceGameState>, AtomRegistry.AtomRegistry>,
+			Exclude<FnRequirements<typeof reduceGameState>, AtomRegistry.AtomRegistry> | KeyValueStore.KeyValueStore,
 			HttpClientError
 		>
 	) {
 		const initialValue = yield* createInitialSnapshot
 		// todo: gameState should maybe not be initialized till the runtime is done (so that we have wordlist)
-		const gameState = Atom.make<GameState>(GameState.Active({ snapshot: initialValue }))
+		const gameState = Atom.kvs({
+			runtime,
+			schema: pipe(
+				Schema.String,
+				Schema.decodeTo(
+					Schema.declare<GameState>((u: unknown): u is GameState =>
+						typeof u === "object" && u !== null && GameState.$is("Active")(u) || GameState.$is("Crashed")(u)
+					),
+					{
+						decode: SchemaGetter.transform((str) => JSON.parse(str) as GameState),
+						encode: SchemaGetter.transform((state) => JSON.stringify(state))
+					}
+				)
+			),
+			key: `hostedGameState`,
+			defaultValue: () => GameState.Active({ snapshot: initialValue })
+		})
 		const reduceFn = runtime.fn(Effect.fn(function*(action: GameMatchAction, get: Atom.FnContext) {
 			const current = get(gameState)
 			if (GameState.$is("Crashed")(current)) {

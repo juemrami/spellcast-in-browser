@@ -3,13 +3,14 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 
 import { RegistryContext } from "@effect/atom-solid"
+import { layerLocalStorage } from "@effect/platform-browser/BrowserKeyValueStore"
 import { Exit, Scope } from "effect"
 import { pipe } from "effect/Function"
 import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
 import * as BoardService from "./BoardService"
-import { PlayerCurrentWordAtoms } from "./PlayerCurrentWordAtoms"
 import * as GameStateMachine from "./GameStateMachine"
+import { PlayerCurrentWordAtoms } from "./PlayerCurrentWordAtoms"
 import { ClientPlayerState } from "./PlayerState"
 import { WordList } from "./WordList"
 
@@ -18,7 +19,8 @@ const createGameSession = Effect.gen(function*() {
 	const memoMap = Layer.makeMemoMapUnsafe()
 
 	const BoardLayer = Layer.provide(BoardService.live, WordList.layerWordnik)
-	const atomRuntime = Atom.context({ memoMap })(BoardLayer)
+	const BrowserKvsLayer = layerLocalStorage
+	const atomRuntime = Atom.context({ memoMap })(Layer.mergeAll(BoardLayer, BrowserKvsLayer))
 	const AtomRuntimeLayer = yield* Atom.get(atomRuntime.layer)
 
 	const makeStateMachine = pipe(

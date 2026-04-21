@@ -16,7 +16,10 @@ const CurrentTurnTimer = (props: ComponentProps<"div">) => {
 		const state = gameState()
 		if (isActiveTurnState(state)) {
 			const { endsAtMs } = state.snapshot.currentRound.currentTurn
-			const totalMs = Duration.toMillis(state.snapshot.currentRound.turnDuration)
+			// note: duration is a class, but when state is deserialized it becomes a plain object.
+			// causes effect to error when it tries to access `.value._tag` on the object
+			// todo: use Schema to describe the GameState instead of taggedEnum
+			const totalMs = Duration.toMillis(Duration.fromInputUnsafe(state.snapshot.currentRound.turnDuration))
 			return { endsAtMs, totalMs }
 		}
 		return null

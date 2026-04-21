@@ -11,6 +11,9 @@ importers:
       '@effect/atom-solid':
         specifier: 4.0.0-beta.52
         version: 4.0.0-beta.52(effect@4.0.0-beta.52)(solid-js@1.9.9)
+      '@effect/platform-browser':
+        specifier: 4.0.0-beta.52
+        version: 4.0.0-beta.52(effect@4.0.0-beta.52)
       effect:
         specifier: 4.0.0-beta.52
         version: 4.0.0-beta.52
@@ -200,6 +203,11 @@ packages:
   '@effect/language-service@0.85.1':
     resolution: {integrity: sha512-EXnJjIy6zQ3nUO/MZ+ynWUb8B895KZPotd1++oTs9JjDkplwM7cb6zo8Zq2zU6piwq+KflO7amXbEfj1UMpHkw==}
     hasBin: true
+
+  '@effect/platform-browser@4.0.0-beta.52':
+    resolution: {integrity: sha512-/5JVgK3NqiRF/8sHhJnzc6QjPxRvsRoe7ZJkH1NitnUXNn0nZHFwTOOM8Vn1Wd1v2SUeOnWbMh3n/FuvvyEtKw==}
+    peerDependencies:
+      effect: ^4.0.0-beta.52
 
   '@effect/tsgo-darwin-arm64@0.5.0':
     resolution: {integrity: sha512-5rkI52N2FoserKgYqLfXuLxvjyymUidx2SgJyWyfG9AwpGVyXOhvn9qJbpbUQxKfsdjYlCjaOHk83TzWr8qgdg==}
@@ -1402,6 +1410,11 @@ snapshots:
       solid-js: 1.9.9
 
   '@effect/language-service@0.85.1': {}
+
+  '@effect/platform-browser@4.0.0-beta.52(effect@4.0.0-beta.52)':
+    dependencies:
+      effect: 4.0.0-beta.52
+      multipasta: 0.2.7
 
   '@effect/tsgo-darwin-arm64@0.5.0':
     optional: true
