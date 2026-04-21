@@ -82,12 +82,18 @@ export const make = Effect.gen(function*() {
 	const boardSolutions = Atom.make(Effect.fn(function*(get) {
 		return get(lastGeneration).solutions
 	})).pipe(Atom.keepAlive)
+	const isValidPath = Atom.fn(Effect.fn(function*(path: Tile[], get: Atom.FnContext) {
+		const solutions = yield* get.result(boardSolutions)
+		const word = path.map((t) => t.letter).join("")
+		return solutions.words.has(word.toLocaleLowerCase())
+	}))
 	return {
 		boardTiles,
 		tileCount,
 		getTileScore,
 		regenerateBoard,
-		boardSolutions
+		boardSolutions,
+		isValidPath
 	}
 })
 export class BoardService extends Context.Service<BoardService, Effect.Success<typeof make>>()("host/BoardService") {}

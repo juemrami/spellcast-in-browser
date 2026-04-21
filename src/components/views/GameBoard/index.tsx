@@ -1,5 +1,7 @@
+import { useAtom, useAtomMount } from "@effect/atom-solid"
 import type { Data } from "effect"
 import type { GameMatchState } from "../../../services/GameStateMachine"
+import { playerState } from "../../../services/layers"
 import { Switch } from "../../ui/primitives/switch"
 import Board from "./Board"
 import CurrentWord from "./CurrentWord"
@@ -9,6 +11,8 @@ import TurnTimer from "./TurnTimer"
 
 // oxlint-disable-next-line no-unused-vars
 const board = (props: { state: Data.TaggedEnum.Value<GameMatchState, "InRound"> }) => {
+	const [autoSubmit, setAutoSubmit] = useAtom(() => playerState.atoms.autoSubmit.value)
+	useAtomMount(() => playerState.atoms.autoSubmit.effect)
 	return (
 		<>
 			<PlayerScoreboard class="mb-2" />
@@ -16,7 +20,7 @@ const board = (props: { state: Data.TaggedEnum.Value<GameMatchState, "InRound"> 
 				<TurnTimer class="min-w-0 flex-1" />
 				<div class="flex shrink-0 items-center gap-3 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge">
 					<span class="text-label-muted">auto-submit</span>
-					<Switch ariaLabel="Auto-submit" class="shrink-0" onChange={() => {}} />
+					<Switch ariaLabel="Auto-submit" class="shrink-0" checked={autoSubmit()} onChange={setAutoSubmit} />
 				</div>
 			</div>
 			<CurrentWord />
