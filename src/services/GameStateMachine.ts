@@ -88,6 +88,9 @@ type BaseMatch = {
 	readonly matchId: string
 	readonly createdAt: number
 	readonly players: ReadonlyArray<LobbyPlayer>
+	readonly config: {
+		readonly numRounds: 3 | 5 | 7
+	}
 }
 export type GameMatchState = Data.TaggedEnum<{
 	InLobby: BaseMatch
@@ -129,7 +132,10 @@ const createInitialSnapshot = Effect.gen(function*() {
 	return GameMatchState.InLobby({
 		matchId: yield* Random.nextUUIDv4,
 		createdAt: Date.now(),
-		players: []
+		players: [],
+		config: {
+			numRounds: 3
+		}
 	})
 })
 
@@ -231,16 +237,28 @@ const transitionToEndOfRound = Effect.gen(function*() {
 			state: match
 		})
 	}
-	const endedRound = MatchRoundState.Ended({
+	const endedAt = Date.now()
+	const lastRound = MatchRoundState.Ended({
 		...omitTag(match.currentRound),
-		endedAt: Date.now()
+		endedAt
 	})
-	const nextMatchState = GameMatchState.BetweenRounds({
-		...omitTag(match),
-		lastRound: endedRound,
-		rounds: [...match.rounds, endedRound]
-	})
+	const roundMeta = {
+		lastRound,
+		rounds: [...match.rounds, lastRound]
+	}
+	const nextMatchState = (lastRound.id >= match.config.numRounds)
+		? GameMatchState.MatchRecap({
+			...omitTag(match),
+			...roundMeta,
+			endedAt
+		})
+		: GameMatchState.BetweenRounds({
+			...omitTag(match),
+			...roundMeta
+		})
+
 	yield* Ref.set(matchRef, nextMatchState)
+	return nextMatchState
 })
 
 const transitionToNextPlayerTurn = Effect.gen(function*() {
@@ -391,6 +409,9 @@ export type GameMatchAction = Data.TaggedEnum<{
 		}
 		ready?: boolean
 	}
+	setMatchConfig: {
+		numRounds: "Three" | "Five" | "Seven"
+	}
 	leaveLobby: {
 		playerId: string
 	}
@@ -444,6 +465,26 @@ export const reduceGameState = (
 								joinedAt
 							})
 						})
+					}),
+				setMatchConfig: ({ numRounds }) =>
+					Effect.gen(function*() {
+						if (!GameMatchState.$is("InLobby")(state)) {
+							return yield* new InvalidStateTransition({
+								message: "Cannot set match config when game is not in lobby phase",
+								action,
+								state
+							})
+						}
+						const rounds = numRounds === "Three" ? 3 : numRounds === "Five" ? 5 : 7
+						yield* Ref.set(
+							yield* TransitionMatchStateRef,
+							GameMatchState.InLobby({
+								...omitTag(state),
+								config: {
+									numRounds: rounds
+								}
+							})
+						)
 					}),
 				leaveLobby: ({ playerId }) =>
 					Effect.gen(function*() {

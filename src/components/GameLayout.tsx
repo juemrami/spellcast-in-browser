@@ -14,7 +14,7 @@ const GameLayout: Component = () => {
 	const currentGame = useAtomValue(() => currentGameStateMachine)
 
 	return (
-		<main class="relative min-h-screen overflow-hidden px-4 py-8 text-ink sm:px-6 lg:px-8">
+		<main class="relative min-h-screen overflow-hidden px-2 py-8 text-ink sm:px-4 lg:px-6">
 			<div class="absolute inset-x-0 top-0 -z-10 mx-auto h-[28rem] w-[52rem] max-w-full rounded-full bg-glow-rose/44 blur-3xl" />
 			<div class="absolute left-[-8rem] top-32 -z-10 h-80 w-80 rounded-full bg-glow-mint/70 blur-3xl" />
 			<div class="absolute right-[-6rem] bottom-0 -z-10 h-72 w-72 rounded-full bg-glow-sun/55 blur-3xl" />
@@ -46,11 +46,11 @@ const GameLayout: Component = () => {
 						<span>puzzle</span>
 					</div>
 				</header>
-				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-4 shadow-panel-hero sm:p-6">
+				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-2 shadow-panel-hero sm:p-4">
 					{Match.valueTags(currentGame(), {
 						Active: ({ snapshot }) =>
 							GameMatchState.$match(snapshot, {
-								InLobby: (state) => <Lobby players={state.players} />,
+								InLobby: (state) => <Lobby players={state.players} config={state.config} />,
 								InRound: (state) => <GameBoard state={state} />,
 								BetweenRounds: (state) => <RoundSummary state={state} />,
 								MatchRecap: (state) => <RoundSummary state={state} />

@@ -1,6 +1,6 @@
 import { useAtomSet } from "@effect/atom-solid"
 import type { Data } from "effect"
-import { type Component, For, Show } from "solid-js"
+import { type Component, createMemo, For, Show } from "solid-js"
 import type { GameMatchState, ScoreEntry } from "../../services/GameStateMachine"
 import { playerState } from "../../services/layers"
 import type { Tile } from "../../types/game"
@@ -25,7 +25,7 @@ const MINI_TILE_STYLES: Record<Tile["type"], string> = {
 
 const MiniTile: Component<{ tile: Tile }> = (props) => (
 	<div
-		class={`flex select-none items-center justify-center rounded-[0.32rem] border text-[0.65rem] font-extrabold uppercase leading-none tracking-[0.08em] shadow-tile size-[2rem] ${
+		class={`flex select-none items-center justify-center rounded-[0.32rem] border text-[0.65rem] font-extrabold uppercase leading-none tracking-[0.08em] shadow-tile w-full aspect-square ${
 			MINI_TILE_STYLES[props.tile.type]
 		}`}
 	>
@@ -37,20 +37,19 @@ type RoundSummaryState = Data.TaggedEnum.Value<GameMatchState, "BetweenRounds" |
 
 const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 	const startNextRound = useAtomSet(() => playerState.startCurrentGame)
-
+	const resetMatch = useAtomSet(() => playerState.resetMatch)
+	const isMatchRecap = createMemo(() => props.state._tag === "MatchRecap")
 	const lastRound = props.state.lastRound
 	const playerEntries = (() => {
 		const round = lastRound
 		const { players } = props.state
-		const turnOrder = round ? [...round.turnOrder] : players.map((p) => p.id)
+		const turnOrder = round.turnOrder
 		const playersById = new Map(players.map((p) => [p.id, p]))
 
 		const scoresByPlayer = new Map<string, Array<ScoreEntry>>()
-		if (round) {
-			for (const entry of round.scores) {
-				const existing = scoresByPlayer.get(entry.playerId) ?? []
-				scoresByPlayer.set(entry.playerId, [...existing, entry])
-			}
+		for (const entry of isMatchRecap() ? props.state.scoreLedger : round.scores) {
+			const existing = scoresByPlayer.get(entry.playerId) ?? []
+			scoresByPlayer.set(entry.playerId, [...existing, entry])
 		}
 
 		return turnOrder
@@ -65,7 +64,7 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 	})()
 
 	return (
-		<div class="flex w-full flex-col items-center gap-5">
+		<div class="flex w-full flex-col items-center gap-5 pb-4">
 			<div class="flex flex-col items-center gap-1">
 				<p class="text-[0.62rem] font-semibold uppercase tracking-[0.45em] text-label-muted">
 					Round {lastRound.id} complete
@@ -79,7 +78,9 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 				<For each={playerEntries}>
 					{(entry) => {
 						const color = TURN_COLORS[entry.turnIndex % TURN_COLORS.length]
-						const sortedWords = [...entry.words].sort((a, b) => b.points - a.points)
+						const validPlayerSubmission = [...entry.words]
+							.sort((a, b) => b.roundId - a.roundId)
+							.filter((e) => e.path.length > 0)
 						return (
 							<div
 								style={{
@@ -87,7 +88,7 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 									"border-color": color.border,
 									"color": color.text
 								}}
-								class="flex flex-col gap-2 rounded-xl border px-3 pt-2 pb-3 shadow-card"
+								class="flex flex-col gap-2 rounded-xl border px-1.5 pt-2 pb-3 shadow-card"
 							>
 								{/* Player header */}
 								<div class="flex items-center justify-between gap-2">
@@ -98,14 +99,22 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 										</span>
 									</div>
 									<div class="flex flex-col items-end gap-0.5">
-										<span class="tabular-nums text-base font-bold leading-none mr-1">
-											+{entry.roundPoints}
-											<span class="ml-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.18em] opacity-55">
-												pts
+										<span class="tabular-nums text-base font-bold leading-none">
+											{isMatchRecap() ? entry.player.score : `+${entry.roundPoints}`}
+											<span
+												class={`uppercase tracking-[0.18em] opacity-55 ${
+													isMatchRecap() ? "ml-1 text-[0.68rem] font-bold" : "ml-0.5 font-semibold text-[0.6rem]"
+												}`}
+											>
+												{isMatchRecap() ? "total pts" : "pts"}
 											</span>
 										</span>
 										<span class="text-[0.8rem] font-semibold tabular-nums opacity-55 text-center">
-											<span class="mr-1 opacity-190 font-bold">{entry.player.score}</span>total
+											{!isMatchRecap() && (
+												<>
+													<span class="mr-1 opacity-190 font-bold">{entry.player.score}</span>total
+												</>
+											)}
 										</span>
 									</div>
 								</div>
@@ -119,31 +128,40 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 								{/* Words */}
 								<div class="flex flex-col gap-1.5">
 									<Show
-										when={sortedWords.length > 0}
+										when={validPlayerSubmission.length > 0}
 										fallback={
 											<p class="rounded-lg bg-black/[0.06] px-2.5 py-1.5 text-[0.7rem] font-medium">
-												No words submitted this round
+												No word submitted this round
 											</p>
 										}
 									>
-										<For each={sortedWords}>
-											{(wordEntry) => (
-												<div class="flex items-center gap-2 rounded-lg bg-black/[0.06] px-2 py-1.5">
-													<div class="flex flex-wrap gap-[3px]">
-														{wordEntry.word !== ""
-															? (
-																<For each={wordEntry.path}>
-																	{(tile) => <MiniTile tile={tile} />}
-																</For>
-															) :
-															(
-																<p class="text-[0.7rem] font-medium">
-																	No word submitted this round
-																</p>
-															)}
+										{/* Multiple submissions exist for the match recap state to show all round submissions */}
+										<For each={validPlayerSubmission}>
+											{(wordEntry) => {
+												const tiles = wordEntry.path
+												let maxTileSlots = () => {
+													const base = isMatchRecap() ? 14 : 15
+													if (tiles.length > base) {
+														return isMatchRecap() ? 26 : 25
+													}
+													return base
+												}
+												return (
+													<div class="flex items-center gap-2 rounded-lg bg-black/[0.06] px-1 py-1.5">
+														<div
+															class="grid w-full gap-[2px]"
+															style={{ "grid-template-columns": `repeat(${maxTileSlots()}, minmax(0, 1fr))` }}
+														>
+															<For each={tiles}>
+																{(tile) => <MiniTile tile={tile} />}
+															</For>
+															<Show when={isMatchRecap()}>
+																<span>+{wordEntry.points}</span>
+															</Show>
+														</div>
 													</div>
-												</div>
-											)}
+												)
+											}}
 										</For>
 									</Show>
 								</div>
@@ -155,10 +173,10 @@ const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
 
 			<button
 				type="button"
-				onClick={() => startNextRound()}
+				onClick={() => isMatchRecap() ? resetMatch() : startNextRound()}
 				class="mt-1 inline-flex items-center gap-2 rounded-full border border-control-border bg-gradient-to-b from-control-from to-control-to px-7 py-2.5 text-[0.8rem] font-bold uppercase tracking-[0.28em] text-control-text shadow-button transition hover:-translate-y-0.5 active:translate-y-0"
 			>
-				Next round →
+				{isMatchRecap() ? "Return to lobby" : "Next round →"}
 			</button>
 		</div>
 	)

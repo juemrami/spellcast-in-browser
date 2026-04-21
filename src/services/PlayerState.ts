@@ -103,6 +103,18 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			return yield* useActionResult(get)
 		}))
 		const playerId = Atom.readable((get) => get(playerMeta).id)
+		const setMatchConfig = Atom.fn(Effect.fn(function*(numRounds: "Three" | "Five" | "Seven", get: Atom.FnContext) {
+			const game = get(currentGame)
+			if (GameState.$is("Crashed")(game)) return false
+			get.set(currentGame, GameMatchAction.setMatchConfig({ numRounds }))
+			return yield* useActionResult(get)
+		}))
+		const resetMatch = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
+			const game = get(currentGame)
+			if (GameState.$is("Crashed")(game)) return false
+			get.set(currentGame, GameMatchAction.resetMatch())
+			return yield* useActionResult(get)
+		}))
 		const startCurrentGame = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			const game = get(currentGame)
 			if (GameState.$is("Crashed")(game)) {
@@ -153,6 +165,8 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				playerId
 			},
 			joinCurrentGameLobby,
+			setMatchConfig,
+			resetMatch,
 			startCurrentGame,
 			submitSelectionPath,
 			isPlayerTurn: Atom.make((get) => {

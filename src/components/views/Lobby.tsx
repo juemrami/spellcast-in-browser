@@ -7,10 +7,12 @@ import { playerState } from "../../services/layers"
 
 interface LobbyProps {
 	readonly players: ReadonlyArray<LobbyPlayer>
+	readonly config: { numRounds: 3 | 5 | 7 }
 }
 
 const Lobby: Component<LobbyProps> = (props) => {
 	const joinLobby = useAtomSet(() => playerState.joinCurrentGameLobby)
+	const setMatchConfig = useAtomSet(() => playerState.setMatchConfig)
 	const startCurrentGame = useAtomSet(() => playerState.startCurrentGame)
 	const [playerName, setPlayerName] = useAtom(() => playerState.meta.playerName)
 	const playerId = useAtomValue(() => playerState.meta.playerId)
@@ -31,6 +33,30 @@ const Lobby: Component<LobbyProps> = (props) => {
 			<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-label">
 				Waiting for players to join...
 			</p>
+			<div class="flex w-full flex-col gap-2 text-left">
+				<span class="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-label-soft">
+					Match format
+				</span>
+				<div class="flex w-full items-stretch gap-2">
+					<For each={[3, 5, 7] as const}>
+						{(rounds) => (
+							<label class="group flex flex-[1_1_auto] cursor-pointer items-center justify-center rounded-xl border px-3 py-3 transition-all duration-150 border-shell bg-paper-50 hover:border-tile-gem-border/60 has-[:checked]:border-tile-gem-border has-[:checked]:bg-gradient-to-b has-[:checked]:from-tile-gem-from has-[:checked]:to-tile-gem-via has-[:checked]:shadow-sm">
+								<input
+									type="radio"
+									name="matchRounds"
+									class="hidden"
+									value={rounds}
+									checked={props.config.numRounds === rounds}
+									onChange={() => setMatchConfig(rounds === 3 ? "Three" : rounds === 5 ? "Five" : "Seven")}
+								/>
+								<span class="text-xs font-bold uppercase tracking-[0.2em] text-label-soft transition-colors group-has-[:checked]:text-tile-gem-text">
+									{rounds} Rounds
+								</span>
+							</label>
+						)}
+					</For>
+				</div>
+			</div>
 			<div class="w-full rounded-xl border border-shell bg-paper-50 px-3 py-2 text-left text-xs font-semibold tracking-[0.12em] text-ink">
 				<div class="flex items-center justify-between gap-3 uppercase tracking-[0.2em] text-label-soft">
 					<span>Players</span>
