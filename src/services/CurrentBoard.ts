@@ -6,7 +6,7 @@ import * as Atom from "effect/unstable/reactivity/Atom"
 import { Match, Ref, String } from "effect"
 import { pipe } from "effect/Function"
 import { BOARD_SIZE, type Tile } from "../types/game"
-import { BoardGenerator } from "./BoardGenerator"
+import { type BoardGeneration, BoardGenerator } from "./BoardGenerator"
 
 const letterPointScores = {
 	// points: [letters]
@@ -93,18 +93,24 @@ class ScoringService extends Context.Service<ScoringService>()(
 
 export const make = Effect.gen(function*() {
 	const boardGenerator = yield* BoardGenerator
-	const genNewBoard = (seed?: string | number) =>
+	const generateBoard = (seed?: string | number) =>
 		boardGenerator.generate(BOARD_SIZE, {
 			maxOccurrencesPerLetter: 4,
 			minAvgWordLength: 4.5,
 			minWordLength: 2,
 			seed: seed
 		})
-	// todo: clean this up so im not wasting compute on this first generation
-	const generationRef = yield* Ref.make(yield* genNewBoard(6969))
+	const EmptyBoard: BoardGeneration = {
+		board: [],
+		solutions: {
+			words: new Set(),
+			paths: []
+		}
+	}
+	const generationRef = yield* Ref.make(EmptyBoard)
 	const generationAtom = Atom.make(yield* Ref.get(generationRef))
 	const regenerateBoard = Effect.fn(function*(seed?: string | number) {
-		const newBoard = yield* genNewBoard(seed)
+		const newBoard = yield* generateBoard(seed)
 		yield* Ref.set(generationRef, newBoard)
 		yield* Atom.set(generationAtom, newBoard)
 	})

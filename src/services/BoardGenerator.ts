@@ -89,5 +89,7 @@ export class BoardGenerator extends Context.Service<BoardGenerator>()("host/Boar
 	)
 }
 
+export type BoardGeneration = Effect.Success<ReturnType<typeof BoardGenerator.Service.generate>>
+
 export const generate = (...args: Parameters<typeof BoardGenerator.Service.generate>) =>
 	BoardGenerator.use((service) => service.generate(...args))
