@@ -108,19 +108,19 @@ export const make = Effect.gen(function*() {
 		}
 	}
 	const generationRef = yield* Ref.make(EmptyBoard)
-	const generationAtom = Atom.make(yield* Ref.get(generationRef))
 	const regenerateBoard = Effect.fn(function*(seed?: string | number) {
-		const newBoard = yield* generateBoard(seed)
-		yield* Ref.set(generationRef, newBoard)
-		yield* Atom.set(generationAtom, newBoard)
+		return yield* pipe(
+			generateBoard(seed),
+			Effect.tap((generation) => Ref.set(generationRef, generation))
+		)
 	})
 	const boardSolutions = Ref.get(generationRef).pipe(Effect.map((board) => board.solutions))
+	const boardTiles = Ref.get(generationRef).pipe(Effect.map((board) => board.board))
 	const isValidPath = Effect.fn(function*(path: Array<Tile>) {
 		const solutions = yield* boardSolutions
 		// validate that the path tiles exists and the letter match
 		for (const tile of path) {
-			const boardTiles = yield* Ref.get(generationRef).pipe(Effect.map((board) => board.board))
-			const matchingTile = boardTiles.find((t) => t.col === tile.col && t.row === tile.row)
+			const matchingTile = (yield* boardTiles).find((t) => t.col === tile.col && t.row === tile.row)
 			if (!matchingTile || matchingTile.letter !== tile.letter) {
 				return false
 			}
@@ -131,11 +131,6 @@ export const make = Effect.gen(function*() {
 		}
 		return true
 	})
-	const boardAtom = Atom.make((get) => get(generationAtom).board)
-	const tileCountAtom = Atom.make((get) => get(generationAtom).board.length)
-	const regenerateBoardAtom = Atom.fn((seed: number | string | void) => regenerateBoard(seed ?? undefined))
-	const boardSolutionsAtom = Atom.make((get) => get(generationAtom).solutions).pipe(Atom.keepAlive)
-	const isValidPathAtom = Atom.fn(isValidPath)
 	return {
 		regenerateBoard,
 		boardSolutions,
@@ -143,11 +138,8 @@ export const make = Effect.gen(function*() {
 		// todo: maybe dont expose this here, and make consumers use the scoring service directly for this? idk
 		getTileScore: (yield* ScoringService).getTileScore,
 		atoms: {
-			regenerateBoard: regenerateBoardAtom,
-			boardSolutions: boardSolutionsAtom,
-			board: boardAtom,
-			isValidPath: isValidPathAtom,
-			tileCount: tileCountAtom
+			board: Atom.make(() => boardTiles),
+			tileCount: Atom.make(() => Effect.map(boardTiles, (tiles) => tiles.length))
 		}
 	}
 })

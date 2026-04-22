@@ -45,7 +45,7 @@ const dfs = (
 	}
 	visited.set(`${tile.row},${tile.col}`, false) // backtrack -- same tile can be used in different paths
 }
-type BoggleSolutions = {
+export type BoggleSolutions = {
 	paths: Array<Path>
 	/** Set of lowercase words found on the board */
 	words: Set<string>

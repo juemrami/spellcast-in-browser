@@ -718,14 +718,14 @@ export const make = Effect.fn(
 		})
 
 		const registry = yield* AtomRegistry.AtomRegistry
-		// side effect go generating the board based on the round seed.
+		// side effect: ensures update to date board based on the round seed.
 		// todo: this should be done imperatively on new round creation.
 		registry.mount(runtime.atom(Effect.fn(function*(get: Atom.AtomContext) {
 			const boardService = yield* BoardService.CurrentBoard
 			const state = get(gameState)
 			if (GameState.$is("Active")(state) && GameMatchState.$is("InRound")(state.snapshot)) {
 				const seed = state.snapshot.currentRound.seed
-				get.set(boardService.atoms.regenerateBoard, seed)
+				yield* boardService.regenerateBoard(seed)
 			}
 		})))
 		const reduceFn = runtime.fn(Effect.fn(function*(action: GameMatchAction, get: Atom.FnContext) {

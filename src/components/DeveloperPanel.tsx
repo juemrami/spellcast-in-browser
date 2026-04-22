@@ -1,12 +1,40 @@
-import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-solid"
-import { Match } from "effect"
-import { AsyncResult } from "effect/unstable/reactivity"
-import { type Component, For } from "solid-js"
+// oxlint-disable no-console
+import { RegistryContext, useAtom, useAtomSet } from "@effect/atom-solid"
+import { Effect, Exit, identity, Match, pipe } from "effect"
+import { AtomRegistry } from "effect/unstable/reactivity"
+import { type Component, For, useContext } from "solid-js"
+import type { BoggleSolutions } from "../services/BoggleSolver"
 import { GameMatchAction, GameMatchState } from "../services/GameStateMachine"
 import { boardService, currentGameStateMachine, playerState } from "../services/layers"
 
+const regenerateBoard = async () => {
+	try {
+		await Effect.runPromise(
+			boardService.regenerateBoard().pipe(
+				Effect.provideService(AtomRegistry.AtomRegistry, useContext(RegistryContext))
+			)
+		)
+	} catch (e) {
+		console.error("Failed to regenerate board", { cause: e })
+	}
+}
+
+const solutions = () =>
+	pipe(
+		Effect.runSyncExit(boardService.boardSolutions),
+		Exit.match({
+			onSuccess: identity,
+			onFailure: (e) => {
+				console.error("Failed to get board solutions", { cause: e })
+				return {
+					words: new Set(),
+					paths: []
+				} satisfies BoggleSolutions
+			}
+		})
+	)
+
 const DeveloperPanel: Component = () => {
-	const regenerateBoard = useAtomSet(() => boardService.atoms.regenerateBoard)
 	const clearSelectionPath = useAtomSet(() => playerState.clearSelectionPath)
 	const [currentGameState, reduceGameState] = useAtom(() => currentGameStateMachine)
 	const matchState = () =>
@@ -14,11 +42,11 @@ const DeveloperPanel: Component = () => {
 			Active: ({ snapshot }) => snapshot,
 			Crashed: (_) => undefined
 		})
-	const solutions = useAtomValue(() => boardService.atoms.boardSolutions)
 	const handleRegenerate = () => {
 		clearSelectionPath()
 		regenerateBoard()
 	}
+	const words = () => [...(solutions().words)].sort((firstWord, secondWord) => firstWord.localeCompare(secondWord))
 	return (
 		<aside
 			id="developer-panel"
@@ -76,34 +104,25 @@ const DeveloperPanel: Component = () => {
 			</button>
 
 			<div class="mt-3 rounded-lg border border-shell bg-paper-100/80 px-3 py-2">
-				{AsyncResult.match(solutions(), {
-					onSuccess: (solution) => {
-						const words = [...solution.value.words].sort((firstWord, secondWord) => firstWord.localeCompare(secondWord))
-						return (
-							<div class="space-y-2">
-								<div class="flex items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.2em] text-label-soft">
-									<span>Solver words</span>
-									<span class="text-ink">{words.length}</span>
-								</div>
-								{words.length > 0
-									? (
-										<ul class="max-h-40 space-y-1 overflow-auto text-[0.72rem] leading-5 text-ink">
-											<For each={words}>
-												{(word) => (
-													<li class="rounded-md bg-paper-50 px-2 py-1 font-medium tracking-[0.08em]">
-														{word}
-													</li>
-												)}
-											</For>
-										</ul>
-									)
-									: <p class="text-[0.72rem] leading-5 text-label-muted">No words found.</p>}
-							</div>
+				<div class="space-y-2">
+					<div class="flex items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.2em] text-label-soft">
+						<span>Solver words</span>
+						<span class="text-ink">{words().length}</span>
+					</div>
+					{words().length > 0
+						? (
+							<ul class="max-h-40 space-y-1 overflow-auto text-[0.72rem] leading-5 text-ink">
+								<For each={words()}>
+									{(word) => (
+										<li class="rounded-md bg-paper-50 px-2 py-1 font-medium tracking-[0.08em]">
+											{word}
+										</li>
+									)}
+								</For>
+							</ul>
 						)
-					},
-					onInitial: () => <p class="text-[0.72rem] leading-5 text-label-muted">Solving board...</p>,
-					onFailure: () => <p class="text-[0.72rem] leading-5 text-label-muted">Solver unavailable.</p>
-				})}
+						: <p class="text-[0.72rem] leading-5 text-label-muted">No words found.</p>}
+				</div>
 			</div>
 		</aside>
 	)
