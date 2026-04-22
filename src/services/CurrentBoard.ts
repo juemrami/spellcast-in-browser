@@ -3,16 +3,14 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Atom from "effect/unstable/reactivity/Atom"
 
-import { Ref } from "effect"
+import { Match, Ref, String } from "effect"
 import { pipe } from "effect/Function"
-import { toUpperCase } from "effect/String"
 import { BOARD_SIZE, type Tile } from "../types/game"
 import { BoardGenerator } from "./BoardGenerator"
 
-type ScoringType = "letter-points" | "word-length"
 const letterPointScores = {
 	// points: [letters]
-	spellShake: {
+	wordShake: {
 		1: ["A", "E", "I", "O", "U", "L", "N", "S", "T", "R"],
 		2: ["D", "G"],
 		3: ["B", "C", "M", "P"],
@@ -56,9 +54,44 @@ const letterPointScoreLookup: Record<PointScoreSystem, Record<EnglishUpperLetter
 	Object.fromEntries
 )
 
+class ScoringService extends Context.Service<ScoringService>()(
+	"shared/ScoringService",
+	{
+		make: Effect.fn(function*(
+			options: {
+				type: "letter-points"
+				system: PointScoreSystem
+			} | {
+				type: "word-length"
+			}
+		) {
+			const getTileScore = (tile: Tile) =>
+				Match.value(options).pipe(
+					Match.when(
+						{ type: "letter-points" },
+						({ system }) => letterPointScoreLookup[system][String.toUpperCase(tile.letter)] || 0
+					),
+					Match.when({ type: "word-length" }, () => {
+						// eslint-disable-next-line no-console
+						console.log("Word length scoring not implemented yet, defaulting to 1 point per tile")
+						return 1
+					}),
+					Match.exhaustive
+				)
+
+			const getPathScore = (path: Array<Tile>) => path.reduce((score, tile) => score + getTileScore(tile), 0)
+			return {
+				getTileScore,
+				getPathScore
+			}
+		})
+	}
+) {
+	static getPathScore = (path: Array<Tile>) => this.use((s) => Effect.succeed(s.getPathScore(path)))
+	static layer = (...args: Parameters<typeof this.make>) => Layer.effect(this, this.make(...args))
+}
+
 export const make = Effect.gen(function*() {
-	const scoringType = "letter-points" as ScoringType
-	const scoringMethod: keyof typeof letterPointScores = "spellCast"
 	const boardGenerator = yield* BoardGenerator
 	const genNewBoard = (seed?: string | number) =>
 		boardGenerator.generate(BOARD_SIZE, {
@@ -92,16 +125,6 @@ export const make = Effect.gen(function*() {
 		}
 		return true
 	})
-	const getTileScore = (tile: Tile) => {
-		if (scoringType === "word-length") {
-			// eslint-disable-next-line no-console
-			console.log("Word length scoring not implemented yet, defaulting to 1 point per tile")
-			return 1
-		}
-		const letterScoreLookup = letterPointScoreLookup[scoringMethod]
-		return letterScoreLookup[toUpperCase(tile.letter)] || 0
-	}
-
 	const boardAtom = Atom.make((get) => get(generationAtom).board)
 	const tileCountAtom = Atom.make((get) => get(generationAtom).board.length)
 	const regenerateBoardAtom = Atom.fn((seed: number | string | void) => regenerateBoard(seed ?? undefined))
@@ -110,8 +133,9 @@ export const make = Effect.gen(function*() {
 	return {
 		regenerateBoard,
 		boardSolutions,
-		getTileScore,
 		isValidPath,
+		// todo: maybe dont expose this here, and make consumers use the scoring service directly for this? idk
+		getTileScore: (yield* ScoringService).getTileScore,
 		atoms: {
 			regenerateBoard: regenerateBoardAtom,
 			boardSolutions: boardSolutionsAtom,
@@ -121,9 +145,12 @@ export const make = Effect.gen(function*() {
 		}
 	}
 })
-//* Service for interacting with the currently generated board for the document runtime, assumes 1 game per document - 1 board per game*/
+// * Service for interacting with the currently generated board for the document runtime, assumes 1 game per document - 1 board per game*/
 export class CurrentBoard
 	extends Context.Service<CurrentBoard, Effect.Success<typeof make>>()("host/BoardGeneration")
 {}
 export const layer = Layer.effect(CurrentBoard, make)
-export const live = Layer.provide(layer, BoardGenerator.live)
+export const live = Layer.provide(
+	layer,
+	Layer.mergeAll(BoardGenerator.live, ScoringService.layer({ type: "letter-points", system: "spellCast" }))
+)
