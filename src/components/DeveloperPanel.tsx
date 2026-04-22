@@ -5,7 +5,7 @@ import { AtomRegistry } from "effect/unstable/reactivity"
 import { type Component, For, useContext } from "solid-js"
 import type { BoggleSolutions } from "../services/BoggleSolver"
 import { GameMatchAction, GameMatchState } from "../services/GameStateMachine"
-import { boardService, currentGameStateMachine, playerState } from "../services/layers"
+import { boardService, clientPlayer, currentGameStateMachine } from "../services/layers"
 
 const regenerateBoard = async () => {
 	try {
@@ -35,7 +35,7 @@ const solutions = () =>
 	)
 
 const DeveloperPanel: Component = () => {
-	const clearSelectionPath = useAtomSet(() => playerState.clearSelectionPath)
+	const clearSelectionPath = useAtomSet(() => clientPlayer.atoms.selection.clear)
 	const [currentGameState, reduceGameState] = useAtom(() => currentGameStateMachine)
 	const matchState = () =>
 		Match.valueTags(currentGameState(), {

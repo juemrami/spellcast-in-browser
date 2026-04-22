@@ -3,7 +3,7 @@ import type { Component } from "solid-js"
 import { For } from "solid-js"
 
 import { type LobbyPlayer, MIN_PLAYERS } from "../../services/GameStateMachine"
-import { playerState } from "../../services/layers"
+import { clientPlayer } from "../../services/layers"
 
 interface LobbyProps {
 	readonly players: ReadonlyArray<LobbyPlayer>
@@ -11,11 +11,11 @@ interface LobbyProps {
 }
 
 const Lobby: Component<LobbyProps> = (props) => {
-	const joinLobby = useAtomSet(() => playerState.joinCurrentGameLobby)
-	const setMatchConfig = useAtomSet(() => playerState.setMatchConfig)
-	const startCurrentGame = useAtomSet(() => playerState.startCurrentGame)
-	const [playerName, setPlayerName] = useAtom(() => playerState.meta.playerName)
-	const playerId = useAtomValue(() => playerState.meta.playerId)
+	const joinLobby = useAtomSet(() => clientPlayer.atoms.game.joinLobby)
+	const setMatchConfig = useAtomSet(() => clientPlayer.atoms.game.setConfig)
+	const startCurrentGame = useAtomSet(() => clientPlayer.atoms.game.start)
+	const [playerName, setPlayerName] = useAtom(() => clientPlayer.atoms.player.name)
+	const playerId = useAtomValue(() => clientPlayer.atoms.player.id)
 	const isInLobby = () => props.players.some((player) => player.id === playerId())
 
 	return (

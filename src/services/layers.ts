@@ -10,7 +10,7 @@ import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
 import * as BoardService from "./CurrentBoard"
 import * as GameStateMachine from "./GameStateMachine"
-import { ClientPlayerState } from "./PlayerState"
+import { ClientPlayerState } from "./ClientPlayer"
 import { WordList } from "./WordList"
 
 const scope = Scope.makeUnsafe()
@@ -46,5 +46,5 @@ const createGameSession = Effect.gen(function*() {
 export const { gameContext } = await Effect.runPromise(createGameSession)
 
 export const boardService = Context.get(gameContext, BoardService.CurrentBoard)
-export const playerState = Context.get(gameContext, ClientPlayerState)
+export const clientPlayer = Context.get(gameContext, ClientPlayerState)
 export const currentGameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine).atom

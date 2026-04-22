@@ -186,6 +186,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			)
 		}))
 		// todo: localstorage persistence for this setting
+		// keepAlive to persist component unmounts
 		const autoSubmitOnValidPath = Atom.make(false).pipe(Atom.keepAlive)
 		const autoSubmitEffect = Atom.make(Effect.fn(function*(get: Atom.AtomContext) {
 			const enabled = get(autoSubmitOnValidPath)
@@ -197,8 +198,17 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				yield* get.result(submitSelectionPath)
 			}
 		})).pipe(Atom.keepAlive)
+		const isPlayerTurn = Atom.make((get) => {
+			const game = get(currentGame)
+			if (!isActiveTurnState(game)) return false
+			return game.snapshot.currentRound.currentTurn.playerId === get(playerId)
+		})
 		return {
 			atoms: {
+				player: {
+					name: playerName,
+					id: playerId
+				},
 				autoSubmit: {
 					value: autoSubmitOnValidPath,
 					effect: autoSubmitEffect
@@ -209,27 +219,19 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 					clear: clearSelectionPath,
 					word: currentWord,
 					score: currentWordScore,
-					isValid: isCurrentWordValid
-				}
-			},
-			selectionPath,
-			tryUpdateSelectionPath,
-			clearSelectionPath,
-			isMouseDown,
-			meta: {
-				playerName,
-				playerId
-			},
-			joinCurrentGameLobby,
-			setMatchConfig,
-			resetMatch,
-			startCurrentGame,
-			submitSelectionPath,
-			isPlayerTurn: Atom.make((get) => {
-				const game = get(currentGame)
-				if (!isActiveTurnState(game)) return false
-				return game.snapshot.currentRound.currentTurn.playerId === get(playerId)
-			})
+					isValid: isCurrentWordValid,
+					submit: submitSelectionPath
+				},
+				isMouseDown,
+				game: {
+					state: currentGame,
+					start: startCurrentGame,
+					joinLobby: joinCurrentGameLobby,
+					setConfig: setMatchConfig,
+					reset: resetMatch
+				},
+				isPlayerTurn
+			}
 		}
 	})
 }) {

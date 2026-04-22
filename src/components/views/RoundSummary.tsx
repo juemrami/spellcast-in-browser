@@ -2,7 +2,7 @@ import { useAtomSet } from "@effect/atom-solid"
 import type { Data } from "effect"
 import { type Component, createMemo, For, Show } from "solid-js"
 import type { GameMatchState, ScoreEntry } from "../../services/GameStateMachine"
-import { playerState } from "../../services/layers"
+import { clientPlayer } from "../../services/layers"
 import type { Tile } from "../../types/game"
 import TurnOrderBadge from "../ui/TurnOrderBadge"
 
@@ -36,8 +36,8 @@ const MiniTile: Component<{ tile: Tile }> = (props) => (
 type RoundSummaryState = Data.TaggedEnum.Value<GameMatchState, "BetweenRounds" | "MatchRecap">
 
 const RoundSummary: Component<{ state: RoundSummaryState }> = (props) => {
-	const startNextRound = useAtomSet(() => playerState.startCurrentGame)
-	const resetMatch = useAtomSet(() => playerState.resetMatch)
+	const startNextRound = useAtomSet(() => clientPlayer.atoms.game.start)
+	const resetMatch = useAtomSet(() => clientPlayer.atoms.game.reset)
 	const isMatchRecap = createMemo(() => props.state._tag === "MatchRecap")
 	const lastRound = props.state.lastRound
 	const playerEntries = (() => {

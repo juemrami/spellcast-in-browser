@@ -1,12 +1,12 @@
 import { useAtom, useAtomValue } from "@effect/atom-solid"
 import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, createEffect } from "solid-js"
-import { playerState } from "../../../services/layers"
+import { clientPlayer } from "../../../services/layers"
 const SubmitButton: Component = () => {
-	const isPlayerTurn = useAtomValue(() => playerState.isPlayerTurn)
-	const isCurrentWordValid = useAtomValue(() => playerState.atoms.selection.isValid)
-	const [, clearSelectionPath] = useAtom(() => playerState.atoms.selection.clear)
-	const [submitResult, submitCurrentWord] = useAtom(() => playerState.submitSelectionPath)
+	const isPlayerTurn = useAtomValue(() => clientPlayer.atoms.isPlayerTurn)
+	const isCurrentWordValid = useAtomValue(() => clientPlayer.atoms.selection.isValid)
+	const [, clearSelectionPath] = useAtom(() => clientPlayer.atoms.selection.clear)
+	const [submitResult, submitCurrentWord] = useAtom(() => clientPlayer.atoms.selection.submit)
 	createEffect(() => {
 		AsyncResult.match(submitResult(), {
 			"onSuccess": ({ waiting, value: isValid }) => {

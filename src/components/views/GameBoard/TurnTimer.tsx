@@ -2,12 +2,12 @@ import { useAtomValue } from "@effect/atom-solid"
 import { Duration } from "effect"
 import { type ComponentProps, createMemo, createSignal, onCleanup, Show, splitProps } from "solid-js"
 import { isActiveTurnState } from "../../../services/GameStateMachine"
-import { currentGameStateMachine, playerState } from "../../../services/layers"
+import { clientPlayer, currentGameStateMachine } from "../../../services/layers"
 
 const CurrentTurnTimer = (props: ComponentProps<"div">) => {
 	const [local, rest] = splitProps(props, ["class"])
 	const gameState = useAtomValue(() => currentGameStateMachine)
-	const isPlayerTurn = useAtomValue(() => playerState.isPlayerTurn)
+	const isPlayerTurn = useAtomValue(() => clientPlayer.atoms.isPlayerTurn)
 
 	const [now, setNow] = createSignal(Date.now())
 	const interval = setInterval(() => setNow(Date.now()), 100)
