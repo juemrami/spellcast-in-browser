@@ -2,13 +2,13 @@ import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import type { Component } from "solid-js"
 
 import { AsyncResult } from "effect/unstable/reactivity"
-import { currentWordService, playerState } from "../../../services/layers"
+import { playerState } from "../../../services/layers"
 
 const CurrentWord: Component = () => {
-	const word = useAtomValue(() => currentWordService.word)
-	const clearPlayerSelection = useAtomSet(() => playerState.clearSelectionPath)
-	const getCurrentWordScore = useAtomValue(() => currentWordService.currentWordScore)
-	const isCurrentWordValid = useAtomValue(() => currentWordService.isCurrentWordValid)
+	const word = useAtomValue(() => playerState.atoms.selection.word)
+	const clearPlayerSelection = useAtomSet(() => playerState.atoms.selection.clear)
+	const getCurrentWordScore = useAtomValue(() => playerState.atoms.selection.score)
+	const isCurrentWordValid = useAtomValue(() => playerState.atoms.selection.isValid)
 	const scorePlaceholder = (
 		<span class="font-bold text-lg text-zinc-300 opacity-0">
 			0 <span class="text-xs text-zinc-300">points</span>
