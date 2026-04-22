@@ -1,4 +1,4 @@
-import { Cache, Effect, Layer, pipe } from "effect"
+import { Effect, Layer, pipe } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
@@ -15,7 +15,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 	make: Effect.gen(function*() {
 		const selectionPath = Atom.make([] as Array<Tile>)
 		const { atom: currentGame, dispatch: actionDispatch } = yield* GameStateMachine
-		const { isValidPath, getTileScore } = yield* CurrentBoard
+		const { scoring: { isValidPath, getPathScore } } = yield* CurrentBoard
 		const useActionResult = <T extends Atom.FnContext>(get: T) => get.result(actionDispatch)
 		const tryUpdateSelectionPath = Atom.fn(Effect.fn(function*(tile: Tile, get: Atom.FnContext) {
 			const path = get(selectionPath)
@@ -45,29 +45,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 		const clearSelectionPath = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			get.set(selectionPath, [])
 		}))
-		const scoreCache = yield* Cache.make({
-			capacity: 1_000,
-			lookup: (key: string) =>
-				Effect.gen(
-					function*() {
-						const path = ketToPath(key)
-						let score = 0
-						for (const tile of path) {
-							score += getTileScore(tile)
-						}
-						return score
-					}
-				)
-		})
-		const pathToKey = (path: Array<Tile>): string => JSON.stringify(path)
-		const ketToPath = (key: string): Array<Tile> => JSON.parse(key)
-		const currentWordScore = Atom.make((get) =>
-			Effect.gen(function*() {
-				const path = get(selectionPath)
-				const score = yield* Cache.get(scoreCache, pathToKey(path))
-				return score
-			})
-		)
+		const currentWordScore = Atom.make((get) => pipe(get(selectionPath), getPathScore))
 		const currentWord = Atom.make((ctx) => {
 			const path = ctx.get(selectionPath)
 			return path.map((tile) => tile!.letter).join("")

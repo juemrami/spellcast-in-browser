@@ -8,9 +8,9 @@ import { Exit, Scope } from "effect"
 import { pipe } from "effect/Function"
 import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
+import { ClientPlayerState } from "./ClientPlayer"
 import * as BoardService from "./CurrentBoard"
 import * as GameStateMachine from "./GameStateMachine"
-import { ClientPlayerState } from "./ClientPlayer"
 import { WordList } from "./WordList"
 
 const scope = Scope.makeUnsafe()

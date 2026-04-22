@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Atom from "effect/unstable/reactivity/Atom"
 
-import { Match, Ref, String } from "effect"
+import { Cache, Match, Ref, String } from "effect"
 import { pipe } from "effect/Function"
 import { BOARD_SIZE, type Tile } from "../types/game"
 import { type BoardGeneration, BoardGenerator } from "./BoardGenerator"
@@ -65,24 +65,41 @@ class ScoringService extends Context.Service<ScoringService>()(
 				type: "word-length"
 			}
 		) {
-			const getTileScore = (tile: Tile) =>
+			const getLetterScore = (letter: EnglishUpperLetter) =>
 				Match.value(options).pipe(
 					Match.when(
 						{ type: "letter-points" },
-						({ system }) => letterPointScoreLookup[system][String.toUpperCase(tile.letter)] || 0
+						({ system }) => letterPointScoreLookup[system][letter] || 0
 					),
 					Match.when({ type: "word-length" }, () => {
 						// eslint-disable-next-line no-console
-						console.log("Word length scoring not implemented yet, defaulting to 1 point per tile")
-						return 1
+						console.log("Word length scoring calculated by length of word, ignoring letter values")
+						return 0
 					}),
 					Match.exhaustive
 				)
-
-			const getPathScore = (path: Array<Tile>) => path.reduce((score, tile) => score + getTileScore(tile), 0)
+			// note if theres ever scoring pased on positional and row/col is required. refactor this or dont cache
+			const pathToScoreKey = (path: Array<Tile>): string => path.map((tile) => tile.letter).join("")
+			const scoreKeyToLetterArray = (key: string): Array<EnglishUpperLetter> =>
+				key.split("").map((char) => String.toUpperCase(char) as EnglishUpperLetter)
+			/** doesn't include an tile specific bonuses */
+			const wordScoreCache = yield* Cache.make({
+				capacity: 1_000,
+				lookup: (key: string) =>
+					Effect.gen(
+						function*() {
+							const letters = scoreKeyToLetterArray(key)
+							let score = letters.reduce((acc, letter) => acc + getLetterScore(letter), 0)
+							return score
+						}
+					)
+			})
 			return {
-				getTileScore,
-				getPathScore
+				// todo: account for Tile.type multipliers or additions
+				getTileScore: (tile: Tile) => getLetterScore(String.toUpperCase(tile.letter)),
+				getPathScore: Effect.fn(function*(path: Array<Tile>) {
+					return yield* Cache.get(wordScoreCache, pathToScoreKey(path))
+				})
 			}
 		})
 	}
@@ -134,9 +151,11 @@ export const make = Effect.gen(function*() {
 	return {
 		regenerateBoard,
 		boardSolutions,
-		isValidPath,
-		// todo: maybe dont expose this here, and make consumers use the scoring service directly for this? idk
-		getTileScore: (yield* ScoringService).getTileScore,
+		scoring: {
+			// todo: maybe dont expose this here, and make consumers use the scoring service directly for this? idk
+			...yield* ScoringService,
+			isValidPath
+		},
 		atoms: {
 			board: Atom.make(() => boardTiles),
 			tileCount: Atom.make(() => Effect.map(boardTiles, (tiles) => tiles.length))

@@ -30,7 +30,7 @@ const TileView: Component<{ readonly tile: Tile }> = (props) => {
 	const trySelectTile = useAtomSet(() => clientPlayer.atoms.selection.tryUpdate)
 	const clearSelectionPath = useAtomSet(() => clientPlayer.atoms.selection.clear)
 	const isMouseDown = useAtomValue(() => clientPlayer.atoms.isMouseDown)
-	const tileScore = boardService.getTileScore(props.tile)
+	const tileScore = boardService.scoring.getTileScore(props.tile)
 	const isTileSelected = useAtomValue(() =>
 		pipe(
 			clientPlayer.atoms.selection.path,

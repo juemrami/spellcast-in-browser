@@ -340,7 +340,7 @@ const scoreAndClosePlayerTurn = Effect.fn(function*(
 ) {
 	const stateRef = yield* TransitionMatchStateRef
 	const state = yield* Ref.get(stateRef)
-	const board = yield* BoardService.CurrentBoard
+	const { scoring } = yield* BoardService.CurrentBoard
 	if (!GameMatchState.$is("InRound")(state) || currentRound.id !== state.currentRound?.id) {
 		return yield* Effect.die(
 			"scoreAndClosePlayerTurn currentRound's id does not match the current round ID in game state"
@@ -354,7 +354,7 @@ const scoreAndClosePlayerTurn = Effect.fn(function*(
 		})
 	}
 	const word = path.map((node) => node.letter).join("")
-	const points = path.reduce((score, pathNode) => score + board.getTileScore(pathNode), 0)
+	const points = yield* scoring.getPathScore(path)
 	const scoreEntry: ScoreEntry = {
 		id: `${currentRound.id}-${playerId}`,
 		playerId,
