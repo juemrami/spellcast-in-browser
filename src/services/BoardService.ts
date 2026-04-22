@@ -60,15 +60,18 @@ export const make = Effect.gen(function*() {
 	const scoringType = "letter-points" as ScoringType
 	const scoringMethod: keyof typeof letterPointScores = "spellCast"
 	const boardGenerator = yield* BoardGenerator
-	const genNewBoard = boardGenerator.generate(BOARD_SIZE, {
-		maxOccurrencesPerLetter: 4,
-		minAvgWordLength: 4.5,
-		minWordLength: 2
-	})
-	const generationRef = yield* Ref.make(yield* genNewBoard)
+	const genNewBoard = (seed?: string | number) =>
+		boardGenerator.generate(BOARD_SIZE, {
+			maxOccurrencesPerLetter: 4,
+			minAvgWordLength: 4.5,
+			minWordLength: 2,
+			seed: seed
+		})
+	// todo: clean this up so im not wasting compute on this first generation
+	const generationRef = yield* Ref.make(yield* genNewBoard(6969))
 	const generationAtom = Atom.make(yield* Ref.get(generationRef))
-	const regenerateBoard = Effect.gen(function*() {
-		const newBoard = yield* genNewBoard
+	const regenerateBoard = Effect.fn(function*(seed?: string | number) {
+		const newBoard = yield* genNewBoard(seed)
 		yield* Ref.set(generationRef, newBoard)
 		yield* Atom.set(generationAtom, newBoard)
 	})
@@ -101,7 +104,7 @@ export const make = Effect.gen(function*() {
 
 	const boardAtom = Atom.make((get) => get(generationAtom).board)
 	const tileCountAtom = Atom.make((get) => get(generationAtom).board.length)
-	const regenerateBoardAtom = Atom.fn(() => regenerateBoard)
+	const regenerateBoardAtom = Atom.fn((seed: number | string | void) => regenerateBoard(seed ?? undefined))
 	const boardSolutionsAtom = Atom.make((get) => get(generationAtom).solutions).pipe(Atom.keepAlive)
 	const isValidPathAtom = Atom.fn(isValidPath)
 	return {

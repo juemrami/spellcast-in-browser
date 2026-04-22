@@ -16,7 +16,7 @@ import {
 import type { TaggedEnum } from "effect/Data"
 import type { HttpClientError } from "effect/unstable/http/HttpClientError"
 import type { KeyValueStore } from "effect/unstable/persistence"
-import type { AtomRegistry } from "effect/unstable/reactivity"
+import { AtomRegistry } from "effect/unstable/reactivity"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Path } from "../types/game"
 import * as BoardService from "./BoardService"
@@ -69,6 +69,7 @@ export interface ScoreEntry {
 type BaseRound = {
 	readonly id: number
 	readonly startedAt: number
+	readonly seed: number
 	readonly turnOrder: ReadonlyArray<string>
 	readonly scores: ReadonlyArray<ScoreEntry>
 	readonly turnDuration: Duration.Duration
@@ -200,6 +201,7 @@ const addNewRoundAndTransition = Effect.fn(function*(
 	const id = !GameMatchState.$is("InLobby")(state) ? state.rounds.length + 1 : 1
 	const startedAt = Date.now()
 	const endsAt = startedAt + config.turnDurationMs
+	const roundSeed = yield* Random.nextInt
 	const newRound = MatchRoundState.InProgress({
 		id,
 		startedAt,
@@ -210,7 +212,8 @@ const addNewRoundAndTransition = Effect.fn(function*(
 			turnIndex: 0,
 			endsAtMs: endsAt
 		},
-		scores: []
+		scores: [],
+		seed: roundSeed
 	})
 	const isNewGame = GameMatchState.$is("InLobby")(state)
 	yield* Ref.set(
@@ -713,6 +716,18 @@ export const make = Effect.fn(
 			key: `hostedGameState`,
 			defaultValue: () => GameState.Active({ snapshot: initialValue })
 		})
+
+		const registry = yield* AtomRegistry.AtomRegistry
+		// side effect go generating the board based on the round seed.
+		// todo: this should be done imperatively on new round creation.
+		registry.mount(runtime.atom(Effect.fn(function*(get: Atom.AtomContext) {
+			const boardService = yield* BoardService.BoardService
+			const state = get(gameState)
+			if (GameState.$is("Active")(state) && GameMatchState.$is("InRound")(state.snapshot)) {
+				const seed = state.snapshot.currentRound.seed
+				get.set(boardService.atoms.regenerateBoard, seed)
+			}
+		})))
 		const reduceFn = runtime.fn(Effect.fn(function*(action: GameMatchAction, get: Atom.FnContext) {
 			const current = get(gameState)
 			if (GameState.$is("Crashed")(current)) {

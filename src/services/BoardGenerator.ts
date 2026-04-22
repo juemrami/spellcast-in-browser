@@ -1,4 +1,5 @@
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, identity, Layer, pipe, Random } from "effect"
+import { defined } from "effect/Match"
 import type { Board, Tile } from "../types/game"
 import { BoggleSolver } from "./BoggleSolver"
 import { LetterFrequencyAnalyzer } from "./WordList"
@@ -14,9 +15,13 @@ const make = Effect.gen(function*() {
 			minWordLength?: number
 			/** Inclusive range */
 			totalWordsRange?: [min: number, max: number]
+			seed?: string | number | undefined
 		} = {}) {
 			const freshBoard = Effect.gen(function*() {
-				const letters = yield* analyzer.sample(boardSize * boardSize, options)
+				const letters = yield* pipe(
+					analyzer.sample(boardSize * boardSize, options),
+					defined(options.seed) ? Random.withSeed(options.seed) : identity
+				)
 				const board = []
 				for (let row = 0; row < boardSize; row++) {
 					for (let col = 0; col < boardSize; col++) {
