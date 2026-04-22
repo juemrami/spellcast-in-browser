@@ -19,7 +19,7 @@ import type { KeyValueStore } from "effect/unstable/persistence"
 import { AtomRegistry } from "effect/unstable/reactivity"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Path } from "../types/game"
-import * as BoardService from "./BoardService"
+import * as BoardService from "./CurrentBoard"
 
 export const MIN_PLAYERS = 1
 
@@ -340,7 +340,7 @@ const scoreAndClosePlayerTurn = Effect.fn(function*(
 ) {
 	const stateRef = yield* TransitionMatchStateRef
 	const state = yield* Ref.get(stateRef)
-	const board = yield* BoardService.BoardService
+	const board = yield* BoardService.CurrentBoard
 	if (!GameMatchState.$is("InRound")(state) || currentRound.id !== state.currentRound?.id) {
 		return yield* Effect.die(
 			"scoreAndClosePlayerTurn currentRound's id does not match the current round ID in game state"
@@ -567,7 +567,7 @@ export const reduceGameState = (
 								state
 							})
 						}
-						const board = yield* BoardService.BoardService
+						const board = yield* BoardService.CurrentBoard
 						const submittedWord = submitAction.path.map((node) => node.letter).join("")
 						if (submittedWord.trim().length === 0) {
 							return yield* new EmptyWordSubmitted({
@@ -721,7 +721,7 @@ export const make = Effect.fn(
 		// side effect go generating the board based on the round seed.
 		// todo: this should be done imperatively on new round creation.
 		registry.mount(runtime.atom(Effect.fn(function*(get: Atom.AtomContext) {
-			const boardService = yield* BoardService.BoardService
+			const boardService = yield* BoardService.CurrentBoard
 			const state = get(gameState)
 			if (GameState.$is("Active")(state) && GameMatchState.$is("InRound")(state.snapshot)) {
 				const seed = state.snapshot.currentRound.seed

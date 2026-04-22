@@ -4,11 +4,11 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
-import { BoardService } from "./BoardService"
+import { CurrentBoard } from "./CurrentBoard"
 import { ClientPlayerState } from "./PlayerState"
 
 export const make = Effect.gen(function*() {
-	const board = yield* BoardService
+	const board = yield* CurrentBoard
 	const player = yield* ClientPlayerState
 
 	const currentWord = Atom.make((ctx) => {

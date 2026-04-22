@@ -2,7 +2,7 @@ import { Effect, Layer, pipe } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
-import { BoardService } from "./BoardService"
+import { CurrentBoard } from "./CurrentBoard"
 import { GameMatchAction, GameState, GameStateMachine, isActiveTurnState } from "./GameStateMachine"
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
@@ -14,7 +14,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 	make: Effect.gen(function*() {
 		const selectionPath = Atom.make([] as Array<Tile>)
 		const { atom: currentGame, dispatch: actionDispatch } = yield* GameStateMachine
-		const { isValidPath } = yield* BoardService
+		const { isValidPath } = yield* CurrentBoard
 		const useActionResult = <T extends Atom.FnContext>(get: T) => get.result(actionDispatch)
 		const tryUpdateSelectionPath = Atom.fn(Effect.fn(function*(tile: Tile, get: Atom.FnContext) {
 			const path = get(selectionPath)

@@ -121,6 +121,9 @@ export const make = Effect.gen(function*() {
 		}
 	}
 })
-export class BoardService extends Context.Service<BoardService, Effect.Success<typeof make>>()("host/BoardService") {}
-export const layer = Layer.effect(BoardService, make)
+//* Service for interacting with the currently generated board for the document runtime, assumes 1 game per document - 1 board per game*/
+export class CurrentBoard
+	extends Context.Service<CurrentBoard, Effect.Success<typeof make>>()("host/BoardGeneration")
+{}
+export const layer = Layer.effect(CurrentBoard, make)
 export const live = Layer.provide(layer, BoardGenerator.live)

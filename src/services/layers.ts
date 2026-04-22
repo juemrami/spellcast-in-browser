@@ -8,7 +8,7 @@ import { Exit, Scope } from "effect"
 import { pipe } from "effect/Function"
 import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
-import * as BoardService from "./BoardService"
+import * as BoardService from "./CurrentBoard"
 import * as GameStateMachine from "./GameStateMachine"
 import { PlayerCurrentWordAtoms } from "./PlayerCurrentWordAtoms"
 import { ClientPlayerState } from "./PlayerState"
@@ -47,7 +47,7 @@ const createGameSession = Effect.gen(function*() {
 
 export const { gameContext } = await Effect.runPromise(createGameSession)
 
-export const boardService = Context.get(gameContext, BoardService.BoardService)
+export const boardService = Context.get(gameContext, BoardService.CurrentBoard)
 export const currentWordService = Context.get(gameContext, PlayerCurrentWordAtoms)
 export const playerState = Context.get(gameContext, ClientPlayerState)
 export const currentGameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine).atom

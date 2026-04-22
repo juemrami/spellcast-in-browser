@@ -88,3 +88,6 @@ export class BoardGenerator extends Context.Service<BoardGenerator>()("host/Boar
 		Layer.mergeAll(LetterFrequencyAnalyzer.layer, BoggleSolver.layer)
 	)
 }
+
+export const generate = (...args: Parameters<typeof BoardGenerator.Service.generate>) =>
+	BoardGenerator.use((service) => service.generate(...args))
