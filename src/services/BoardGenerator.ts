@@ -1,4 +1,4 @@
-import { Context, Effect, identity, Layer, pipe, Random } from "effect"
+import { Context, Duration, Effect, identity, Layer, pipe, Random } from "effect"
 import { defined } from "effect/Match"
 import type { Board, Tile } from "../types/game"
 import { BoggleSolver } from "./BoggleSolver"
@@ -38,42 +38,51 @@ const make = Effect.gen(function*() {
 				return board as Board
 			})
 			let board = yield* freshBoard
-			if (options.minAvgWordLength || options.totalWordsRange) {
-				for (let attempt = 0; attempt < (options.maxGenAttempts ?? MAX_GEN_FALLBACK); attempt++) {
-					if (attempt === (options.maxGenAttempts ?? MAX_GEN_FALLBACK) - 1) {
-						console.warn("Max board generation attempts reached")
-						break
-					}
-					const solutions = yield* solver.solve(board, {
-						minWordLength: options.minWordLength
-					})
-					const solutionMeta = yield* solver.analyzeSolution(solutions)
-					const avgWordLength = solutionMeta.avgWordLength
-					const totalWords = solutionMeta.totalWords
-					if (options.minAvgWordLength && avgWordLength < options.minAvgWordLength) {
-						board = yield* freshBoard
-						continue
-					}
-					if (options.totalWordsRange) {
-						const [min, max] = options.totalWordsRange
-						if (totalWords < min || totalWords > max) {
-							board = yield* freshBoard
-							continue
+			let attempt = 0
+			let avgWordLength = 0
+			let totalWords = 0
+			const [duration] = yield* Effect.timed(
+				Effect.gen(function*() {
+					if (options.minAvgWordLength || options.totalWordsRange) {
+						for (attempt = 0; attempt < (options.maxGenAttempts ?? MAX_GEN_FALLBACK); attempt++) {
+							if (attempt === (options.maxGenAttempts ?? MAX_GEN_FALLBACK) - 1) {
+								yield* Effect.log("Max board generation attempts reached")
+								break
+							}
+							const solutions = yield* solver.solve(board, {
+								minWordLength: options.minWordLength
+							})
+							const solutionMeta = yield* solver.analyzeSolution(solutions)
+							avgWordLength = solutionMeta.avgWordLength
+							totalWords = solutionMeta.totalWords
+							if (options.minAvgWordLength && avgWordLength < options.minAvgWordLength) {
+								board = yield* freshBoard
+								continue
+							}
+							if (options.totalWordsRange) {
+								const [min, max] = options.totalWordsRange
+								if (totalWords < min || totalWords > max) {
+									board = yield* freshBoard
+									continue
+								}
+							}
+
+							break
 						}
 					}
-					console.log(
-						`Board generated in ${
-							attempt + 1
-						} attempts with avg word length ${avgWordLength} and total words ${totalWords}`
-					)
-					break
-				}
-			}
+				})
+			)
+			const solutions = yield* solver.solve(board, {
+				minWordLength: options.minWordLength
+			})
+			yield* Effect.log(
+				`Board generated in ${Duration.toSeconds(duration)}s after ${
+					attempt + 1
+				} attempt(s) with avg word length ${avgWordLength} and total words ${totalWords}`
+			)
 			return {
 				board,
-				solutions: yield* solver.solve(board, {
-					minWordLength: options.minWordLength
-				})
+				solutions
 			}
 		})
 	}
