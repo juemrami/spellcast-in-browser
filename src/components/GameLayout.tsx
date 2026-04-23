@@ -1,12 +1,8 @@
 import { useAtomValue } from "@effect/atom-solid"
-import { Match } from "effect"
 import { type Component, createSignal, Show } from "solid-js"
-import { GameMatchState } from "../services/GameStateMachine"
 import { gameStateMachine } from "../services/layers"
 import DeveloperPanel from "./DeveloperPanel"
-import GameBoard from "./views/GameBoard"
-import Lobby from "./views/Lobby"
-import RoundSummary from "./views/RoundSummary"
+import HomeScreen from "./views/HomeScreen"
 
 const GameLayout: Component = () => {
 	// const tileCount = useAtomValue(() => boardService.atoms.tileCount)
@@ -48,6 +44,9 @@ const GameLayout: Component = () => {
 					</div> */
 					}
 				</header>
+				<HomeScreen />
+				{
+					/* TODO: wire up routing — uncomment when HomeScreen navigation is ready
 				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-2 shadow-panel-hero sm:p-4">
 					{Match.valueTags(currentGame(), {
 						Active: ({ snapshot }) =>
@@ -64,7 +63,9 @@ const GameLayout: Component = () => {
 							</p>
 						)
 					})}
-				</section>
+					</section>
+					*/
+				}
 			</div>
 
 			<Show when={isDeveloperPanelOpen()}>
