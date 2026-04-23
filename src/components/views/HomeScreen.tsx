@@ -1,9 +1,27 @@
-import { useAtomSet } from "@effect/atom-solid"
+import { useAtomSet, useAtomValue } from "@effect/atom-solid"
+import { Match } from "effect"
+import { isNotUndefined } from "effect/Predicate"
 import type { Component } from "solid-js"
 import { router } from "../../App"
+import { GameMatchState, GameState } from "../../services/GameStateMachine"
+import { gameStateMachine } from "../../services/layers"
 
 const HomeScreen: Component = () => {
 	const mutateRouter = useAtomSet(() => router.mutate)
+	const currentGame = useAtomValue(() => gameStateMachine.atoms.state)
+	const matchInfo = () => {
+		const state = currentGame()
+		if (GameState.$is("Active")(state)) {
+			return GameMatchState.$match(state.snapshot, {
+				InLobby: (match) => `In Lobby (${match.players.length} players)`,
+				InRound: (match) => `Round ${match.currentRound.id} In Progress.`,
+				BetweenRounds: (match) => `Waiting for next round... (${match.lastRound.id} complete)`,
+				MatchRecap: () => `View final scores.`
+			})
+		} else {
+			return undefined
+		}
+	}
 	return (
 		<div class="flex flex-col items-stretch gap-5 p-3 pt-5 sm:gap-6 sm:p-5 w-full max-w-100">
 			{/* Create Game — hero action, mint/multiplier palette */}
@@ -14,7 +32,9 @@ const HomeScreen: Component = () => {
 					mutateRouter({
 						mutation: (url) => {
 							url.pathname = "/match"
-							url.searchParams.set("fromHome", "true")
+							if (!matchInfo()) {
+								url.searchParams.set("new", "true")
+							}
 						},
 						pushHistory: true
 					})
@@ -23,10 +43,13 @@ const HomeScreen: Component = () => {
 				<div class="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 bg-gradient-to-b from-tile-multiplier-hover-from via-tile-multiplier-hover-via to-tile-multiplier-hover-to" />
 				<div class="relative z-10 flex flex-col items-center gap-1.5">
 					<span class="font-display text-[1.65rem] font-bold leading-none tracking-tight text-tile-multiplier-text">
-						Create Game
+						{matchInfo() ? "Resume Game" : "Create Game"}
 					</span>
-					<span class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-tile-multiplier-text/50">
-						Host a new match
+					<span class="text-[0.65rem] font-bold uppercase tracking-[0.28em] text-tile-multiplier-text/70">
+						{Match.value(matchInfo()).pipe(
+							Match.when(isNotUndefined, (info) => `${info}`),
+							Match.orElse(() => "Host a new match")
+						)}
 					</span>
 				</div>
 			</button>
