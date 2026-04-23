@@ -1,5 +1,5 @@
 {
-	"name": "spellcast",
+	"name": "bogglecast",
 	"version": "0.0.0",
 	"description": "",
 	"type": "module",
@@ -14,9 +14,9 @@
 	"license": "MIT",
 	"devDependencies": {
 		"@effect/language-service": "^0.85.1",
-		"@effect/tsgo": "^0.5.0",
+		"@effect/tsgo": "^0.5.1",
 		"@tailwindcss/vite": "^4.1.13",
-		"@typescript/native-preview": "7.0.0-dev.20260420.1",
+		"@typescript/native-preview": "7.0.0-dev.20260423.1",
 		"dprint": "^0.54.0",
 		"oxlint": "^1.61.0",
 		"tailwindcss": "^4.1.13",
@@ -24,9 +24,9 @@
 		"vite-plugin-solid": "^2.11.8"
 	},
 	"dependencies": {
-		"@effect/atom-solid": "4.0.0-beta.52",
-		"@effect/platform-browser": "4.0.0-beta.52",
-		"effect": "4.0.0-beta.52",
+		"@effect/atom-solid": "4.0.0-beta.56",
+		"@effect/platform-browser": "4.0.0-beta.56",
+		"effect": "4.0.0-beta.56",
 		"solid-js": "^1.9.9"
 	}
 }
