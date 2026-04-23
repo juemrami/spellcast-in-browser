@@ -1,4 +1,4 @@
-import { useAtom, useAtomMount } from "@effect/atom-solid"
+import { useAtom } from "@effect/atom-solid"
 import type { Data } from "effect"
 import type { GameMatchState } from "../../../services/GameStateMachine"
 import { clientPlayer } from "../../../services/layers"
@@ -11,8 +11,7 @@ import TurnTimer from "./TurnTimer"
 
 // oxlint-disable-next-line no-unused-vars
 const board = (props: { state: Data.TaggedEnum.Value<GameMatchState, "InRound"> }) => {
-	const [autoSubmit, setAutoSubmit] = useAtom(() => clientPlayer.atoms.autoSubmit.value)
-	useAtomMount(() => clientPlayer.atoms.autoSubmit.effect)
+	const [autoSubmit, setAutoSubmit] = useAtom(() => clientPlayer.atoms.autoSubmit)
 	return (
 		<>
 			<PlayerScoreboard class="mb-2" />

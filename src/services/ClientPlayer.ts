@@ -143,22 +143,21 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				})
 			)
 		}))
-		const autoSubmitOnValidPath = Atom.kvs({
+		const autoSubmitConfig = Atom.kvs({
 			key: "autoSubmitOnValidPath",
 			schema: Schema.Boolean,
 			defaultValue: () => false,
 			runtime: localStorageAtomRuntime
 		})
 		const autoSubmitEffect = Atom.make(Effect.fn(function*(get: Atom.AtomContext) {
-			const enabled = get(autoSubmitOnValidPath)
+			const enabled = get(autoSubmitConfig)
 			if (!enabled) return
 			const currentPath = get(selectionPath)
 			const valid = yield* isValidPath(currentPath)
 			if (valid) {
 				get.set(submitSelectionPath, void 0)
-				yield* get.result(submitSelectionPath)
 			}
-		})).pipe(Atom.keepAlive) // keepAlive to persist component unmounts
+		}))
 		const isPlayerTurn = Atom.make((get) => {
 			const game = get(currentGame)
 			if (!isActiveTurnState(game)) return false
@@ -170,10 +169,13 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 					name: playerName,
 					id: playerId
 				},
-				autoSubmit: {
-					value: autoSubmitOnValidPath,
-					effect: autoSubmitEffect
-				},
+				autoSubmit: Atom.writable(
+					(get) => {
+						get.mount(autoSubmitEffect)
+						return get(autoSubmitConfig)
+					},
+					(ctx, value: boolean) => ctx.set(autoSubmitConfig, value)
+				),
 				selection: {
 					path: selectionPath,
 					tryUpdate: tryUpdateSelectionPath,
