@@ -1,10 +1,20 @@
+import { useAtomValue } from "@effect/atom-solid"
+import { Option, pipe, Result } from "effect"
 import { createSignal, type ParentComponent, Show } from "solid-js"
+import { router } from "../App"
 import DeveloperPanel from "./DeveloperPanel"
-import HomeScreen from "./views/HomeScreen"
 
 const GameLayout: ParentComponent = (props: { children?: any }) => {
 	// const tileCount = useAtomValue(() => boardService.atoms.tileCount)
+	const currentPath = useAtomValue(() => router.pathname)
 	const [isDeveloperPanelOpen, setDeveloperPanelOpen] = createSignal(false)
+	const isHome = () =>
+		pipe(
+			currentPath(),
+			Result.getSuccess,
+			Option.map((path) => path === "/" || path === "/home"),
+			Option.getOrElse(() => false)
+		)
 	return (
 		<main class="relative min-h-screen overflow-hidden px-2 py-8 text-ink sm:px-4 lg:px-6">
 			<div class="absolute inset-x-0 top-0 -z-10 mx-auto h-[28rem] w-[52rem] max-w-full rounded-full bg-glow-rose/44 blur-3xl" />
@@ -27,11 +37,14 @@ const GameLayout: ParentComponent = (props: { children?: any }) => {
 			</div>
 
 			<div class="mx-auto flex w-full max-w-5xl flex-col items-center gap-7">
-				<header class="flex w-full max-w-[32rem] flex-col items-center gap-4 text-center">
+				<header
+					class={`flex w-full max-w-[32rem] flex-col items-center gap-4 text-center ${
+						!isHome() ? "mt-0" : "not-md:mt-[40%]"
+					}`}
+				>
 					<p class="text-3xl font-semibold uppercase tracking-[0.55em] text-label">
 						BoggleCast
 					</p>
-					{props.children}
 					{
 						/* <div class="inline-flex items-center gap-2 rounded-full border border-shell bg-paper-50/82 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge shadow-pill backdrop-blur">
 						<span>{tileCount()}</span>
@@ -41,28 +54,7 @@ const GameLayout: ParentComponent = (props: { children?: any }) => {
 					</div> */
 					}
 				</header>
-				<HomeScreen />
-				{
-					/* TODO: wire up routing — uncomment when HomeScreen navigation is ready
-				<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-2 shadow-panel-hero sm:p-4">
-					{Match.valueTags(currentGame(), {
-						Active: ({ snapshot }) =>
-							GameMatchState.$match(snapshot, {
-								InLobby: (state) => <Lobby players={state.players} config={state.config} />,
-								InRound: (state) => <GameBoard state={state} />,
-								BetweenRounds: (state) => <RoundSummary state={state} />,
-								MatchRecap: (state) => <RoundSummary state={state} />
-							}),
-						Crashed: ({ cause: error }) => (
-							<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-red-500">
-								Failed to load game state.
-								{console.error(error) ?? error.toString()}
-							</p>
-						)
-					})}
-					</section>
-					*/
-				}
+				{props.children}
 			</div>
 
 			<Show when={isDeveloperPanelOpen()}>

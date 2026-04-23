@@ -1,7 +1,7 @@
 import { useAtom, useAtomValue } from "@effect/atom-solid"
 import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, createEffect } from "solid-js"
-import { clientPlayer } from "../../../services/layers"
+import { clientPlayer } from "../../../../services/layers"
 const SubmitButton: Component = () => {
 	const isPlayerTurn = useAtomValue(() => clientPlayer.atoms.isPlayerTurn)
 	const isCurrentWordValid = useAtomValue(() => clientPlayer.atoms.selection.isValid)

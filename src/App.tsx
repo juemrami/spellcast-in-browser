@@ -2,7 +2,8 @@ import { type Component } from "solid-js"
 
 import { useAtom } from "@effect/atom-solid"
 import { Effect, Match, Result } from "effect"
-import GameLayout from "./components/Layout"
+import SiteLayout from "./components/Layout"
+import GameMatch from "./components/views/GameMatch"
 import HomeScreen from "./components/views/HomeScreen"
 import { TypedSpaRouter } from "./services/SpaAtomRouter"
 
@@ -11,18 +12,21 @@ export const router = Effect.runSync(TypedSpaRouter.make({
 		{
 			route: "/",
 			aliases: ["/home"]
-		}
+		},
+		{ route: "/match", aliases: [] }
 	]
 }))
 
 const App: Component = () => {
 	const [currentPath, setCurrentPath] = useAtom(() => router.pathname)
 	return (
-		<GameLayout>
+		<SiteLayout>
 			{Result.match(currentPath(), {
 				onSuccess: (path) => {
+					console.log("Current path:", path)
 					return Match.value(path).pipe(
 						Match.whenOr("/", "/home", () => <HomeScreen />),
+						Match.when("/match", () => <GameMatch />),
 						Match.exhaustive
 					)
 				},
@@ -34,7 +38,7 @@ const App: Component = () => {
 					return <></>
 				}
 			})}
-		</GameLayout>
+		</SiteLayout>
 	)
 }
 export default App

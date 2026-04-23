@@ -1,10 +1,10 @@
 import { useAtomSet } from "@effect/atom-solid"
 import type { Data } from "effect"
 import { type Component, createMemo, For, Show } from "solid-js"
-import type { GameMatchState, ScoreEntry } from "../../services/GameStateMachine"
-import { clientPlayer } from "../../services/layers"
-import type { Tile } from "../../types/game"
-import TurnOrderBadge from "../ui/TurnOrderBadge"
+import type { GameMatchState, ScoreEntry } from "../../../services/GameStateMachine"
+import { clientPlayer } from "../../../services/layers"
+import type { Tile } from "../../../types/game"
+import TurnOrderBadge from "../../ui/TurnOrderBadge"
 
 // Matches the TURN_COLORS palette used in PlayerScoreboard
 const TURN_COLORS = [

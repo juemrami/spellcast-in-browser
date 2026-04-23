@@ -15,7 +15,7 @@
 	},
 	// note: oxclint automatically ignores .gitignore'd globs
 	"ignorePatterns": [
-		"wordlists/**"
+		"**/wordlists/**"
 	],
 	"jsPlugins": [
 		"./oxlint/effect/index.ts"

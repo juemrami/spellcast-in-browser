@@ -1,8 +1,8 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { type Component, createMemo, For, splitProps } from "solid-js"
-import { GameMatchState, GameState, MatchRoundState } from "../../../services/GameStateMachine"
-import { gameStateMachine } from "../../../services/layers"
-import TurnOrderBadge from "../../ui/TurnOrderBadge"
+import { GameMatchState, GameState, MatchRoundState } from "../../../../services/GameStateMachine"
+import { gameStateMachine } from "../../../../services/layers"
+import TurnOrderBadge from "../../../ui/TurnOrderBadge"
 
 // Ordered color palette for turn positions (rose, mint, sun, lavender)
 const TURN_COLORS: ReadonlyArray<{ bg: string; border: string; text: string; dot: string }> = [

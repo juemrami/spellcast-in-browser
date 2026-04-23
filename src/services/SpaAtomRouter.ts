@@ -99,7 +99,24 @@ export class TypedSpaRouter extends Context.Service<TypedSpaRouter>()(
 							ctx.set(url, { ...args, next })
 							ctx.setSelf(args.hash)
 						}
-					)
+					),
+					mutate: Atom.fnSync((args: {
+						mutation: (url: { pathname: RegisteredPath; searchParams: URLSearchParams; hash: PrefixedHash }) => void
+						pushHistory: boolean
+					}, get) => {
+						const next = Url.mutate(get(url), (url) => {
+							const mutRef = {
+								pathname: url.pathname as RegisteredPath,
+								searchParams: url.searchParams,
+								hash: url.hash as PrefixedHash
+							}
+							args.mutation(mutRef)
+							url.pathname = mutRef.pathname
+							url.search = mutRef.searchParams.toString()
+							url.hash = mutRef.hash
+						})
+						get.set(url, { ...args, next })
+					})
 				}
 			}
 		)

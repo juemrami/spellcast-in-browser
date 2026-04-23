@@ -1,8 +1,8 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { Duration } from "effect"
 import { type ComponentProps, createMemo, createSignal, onCleanup, Show, splitProps } from "solid-js"
-import { isActiveTurnState } from "../../../services/GameStateMachine"
-import { clientPlayer, gameStateMachine } from "../../../services/layers"
+import { isActiveTurnState } from "../../../../services/GameStateMachine"
+import { clientPlayer, gameStateMachine } from "../../../../services/layers"
 
 const CurrentTurnTimer = (props: ComponentProps<"div">) => {
 	const [local, rest] = splitProps(props, ["class"])

@@ -2,8 +2,8 @@ import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-solid"
 import type { Component } from "solid-js"
 import { For } from "solid-js"
 
-import { type LobbyPlayer, MIN_PLAYERS } from "../../services/GameStateMachine"
-import { clientPlayer } from "../../services/layers"
+import { type LobbyPlayer, MIN_PLAYERS } from "../../../services/GameStateMachine"
+import { clientPlayer } from "../../../services/layers"
 
 interface LobbyProps {
 	readonly players: ReadonlyArray<LobbyPlayer>

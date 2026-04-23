@@ -50,6 +50,7 @@ const DeveloperPanel: Component = () => {
 		regenerateBoard()
 	}
 	const words = () => [...(solutions().words)].sort((firstWord, secondWord) => firstWord.localeCompare(secondWord))
+	
 	return (
 		<aside
 			id="developer-panel"

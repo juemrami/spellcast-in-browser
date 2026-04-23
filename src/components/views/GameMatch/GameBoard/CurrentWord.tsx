@@ -2,7 +2,7 @@ import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import type { Component } from "solid-js"
 
 import { AsyncResult } from "effect/unstable/reactivity"
-import { clientPlayer } from "../../../services/layers"
+import { clientPlayer } from "../../../../services/layers"
 
 const CurrentWord: Component = () => {
 	const word = useAtomValue(() => clientPlayer.atoms.selection.word)

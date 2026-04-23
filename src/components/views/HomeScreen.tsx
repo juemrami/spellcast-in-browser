@@ -1,12 +1,24 @@
+import { useAtomSet } from "@effect/atom-solid"
 import type { Component } from "solid-js"
+import { router } from "../../App"
 
 const HomeScreen: Component = () => {
+	const mutateRouter = useAtomSet(() => router.mutate)
 	return (
 		<div class="flex flex-col items-stretch gap-5 p-3 pt-5 sm:gap-6 sm:p-5 w-full max-w-100">
 			{/* Create Game — hero action, mint/multiplier palette */}
 			<button
 				type="button"
 				class="group relative overflow-hidden rounded-2xl border border-tile-multiplier-border bg-gradient-to-b from-tile-multiplier-from via-tile-multiplier-via to-tile-multiplier-to px-4 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:shadow-sm"
+				onClick={() => {
+					mutateRouter({
+						mutation: (url) => {
+							url.pathname = "/match"
+							url.searchParams.set("fromHome", "true")
+						},
+						pushHistory: true
+					})
+				}}
 			>
 				<div class="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 bg-gradient-to-b from-tile-multiplier-hover-from via-tile-multiplier-hover-via to-tile-multiplier-hover-to" />
 				<div class="relative z-10 flex flex-col items-center gap-1.5">
@@ -22,6 +34,7 @@ const HomeScreen: Component = () => {
 			{/* Join Game — secondary action, amber/control palette */}
 			<button
 				type="button"
+				disabled
 				class="group relative overflow-hidden rounded-2xl border border-control-border bg-gradient-to-b from-control-from to-control-to px-4 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
 			>
 				<div class="relative z-10 flex flex-col items-center gap-1">

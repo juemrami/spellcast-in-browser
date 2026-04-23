@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { AsyncResult } from "effect/unstable/reactivity"
 import { type Component, For } from "solid-js"
-import { boardService } from "../../../services/layers"
+import { boardService } from "../../../../services/layers"
 import Tile from "./Tile"
 
 const Board: Component = () => {
