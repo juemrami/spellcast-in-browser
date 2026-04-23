@@ -1,14 +1,10 @@
-import { useAtomValue } from "@effect/atom-solid"
-import { type Component, createSignal, Show } from "solid-js"
-import { gameStateMachine } from "../services/layers"
+import { createSignal, type ParentComponent, Show } from "solid-js"
 import DeveloperPanel from "./DeveloperPanel"
 import HomeScreen from "./views/HomeScreen"
 
-const GameLayout: Component = () => {
+const GameLayout: ParentComponent = (props: { children?: any }) => {
 	// const tileCount = useAtomValue(() => boardService.atoms.tileCount)
 	const [isDeveloperPanelOpen, setDeveloperPanelOpen] = createSignal(false)
-	const currentGame = useAtomValue(() => gameStateMachine.atoms.state)
-
 	return (
 		<main class="relative min-h-screen overflow-hidden px-2 py-8 text-ink sm:px-4 lg:px-6">
 			<div class="absolute inset-x-0 top-0 -z-10 mx-auto h-[28rem] w-[52rem] max-w-full rounded-full bg-glow-rose/44 blur-3xl" />
@@ -35,6 +31,7 @@ const GameLayout: Component = () => {
 					<p class="text-3xl font-semibold uppercase tracking-[0.55em] text-label">
 						BoggleCast
 					</p>
+					{props.children}
 					{
 						/* <div class="inline-flex items-center gap-2 rounded-full border border-shell bg-paper-50/82 px-4 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-badge shadow-pill backdrop-blur">
 						<span>{tileCount()}</span>
