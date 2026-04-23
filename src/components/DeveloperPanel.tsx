@@ -3,6 +3,7 @@ import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { Effect, Exit, identity, Match, pipe } from "effect"
 import { AtomRegistry } from "effect/unstable/reactivity"
 import { type Component, For, useContext } from "solid-js"
+import { router } from "../App"
 import type { BoggleSolutions } from "../services/BoggleSolver"
 import { GameMatchAction, GameMatchState } from "../services/GameStateMachine"
 import { boardService, clientPlayer, gameStateMachine } from "../services/layers"
@@ -36,6 +37,8 @@ const solutions = () =>
 
 const DeveloperPanel: Component = () => {
 	const clearSelectionPath = useAtomSet(() => clientPlayer.atoms.selection.clear)
+	const setRouterPath = useAtomSet(() => router.pathname)
+	const goHome = () => setRouterPath({ path: "/", pushHistory: true })
 	const [currentGameState, reduceGameState] = [
 		useAtomValue(() => gameStateMachine.atoms.state),
 		useAtomSet(() => gameStateMachine.atoms.reduce)
@@ -50,7 +53,7 @@ const DeveloperPanel: Component = () => {
 		regenerateBoard()
 	}
 	const words = () => [...(solutions().words)].sort((firstWord, secondWord) => firstWord.localeCompare(secondWord))
-	
+
 	return (
 		<aside
 			id="developer-panel"
@@ -60,6 +63,16 @@ const DeveloperPanel: Component = () => {
 				<p class="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-label-soft">
 					Developer Panel
 				</p>
+				<div class="flex">
+					<button
+						class="s-4"
+						onClick={() => {
+							goHome()
+						}}
+					>
+						🏠
+					</button>
+				</div>
 			</div>
 			<div class="mt-3 rounded-lg border border-shell bg-paper-100/80 px-3 py-2 text-[0.72rem] leading-5 text-ink">
 				<div class="flex items-center justify-between gap-3">
