@@ -1,9 +1,9 @@
-import { Context, Duration, Effect, identity, Layer, pipe, Random } from "effect"
+import { Context, Duration, Effect, identity, Layer, Random } from "effect"
 import { defined } from "effect/Match"
 import type { Board, Tile } from "../types/game"
 import { BoggleSolver } from "./BoggleSolver"
 import { LetterFrequencyAnalyzer } from "./WordList"
-const MAX_GEN_FALLBACK = 1000
+const MAX_GEN_FALLBACK = 2000
 const make = Effect.gen(function*() {
 	const analyzer = yield* LetterFrequencyAnalyzer
 	const solver = yield* BoggleSolver
@@ -17,11 +17,8 @@ const make = Effect.gen(function*() {
 			totalWordsRange?: [min: number, max: number]
 			seed?: string | number | undefined
 		} = {}) {
-			const freshBoard = Effect.gen(function*() {
-				const letters = yield* pipe(
-					analyzer.sample(boardSize * boardSize, options),
-					defined(options.seed) ? Random.withSeed(options.seed) : identity
-				)
+			const makeFreshBoard = Effect.gen(function*() {
+				const letters = yield* analyzer.sample(boardSize * boardSize, options)
 				const board = []
 				for (let row = 0; row < boardSize; row++) {
 					for (let col = 0; col < boardSize; col++) {
@@ -37,7 +34,7 @@ const make = Effect.gen(function*() {
 				}
 				return board as Board
 			})
-			let board = yield* freshBoard
+			let board = yield* makeFreshBoard
 			let attempt = 0
 			let avgWordLength = 0
 			let totalWords = 0
@@ -56,13 +53,13 @@ const make = Effect.gen(function*() {
 							avgWordLength = solutionMeta.avgWordLength
 							totalWords = solutionMeta.totalWords
 							if (options.minAvgWordLength && avgWordLength < options.minAvgWordLength) {
-								board = yield* freshBoard
+								board = yield* makeFreshBoard
 								continue
 							}
 							if (options.totalWordsRange) {
 								const [min, max] = options.totalWordsRange
 								if (totalWords < min || totalWords > max) {
-									board = yield* freshBoard
+									board = yield* makeFreshBoard
 									continue
 								}
 							}
@@ -70,7 +67,9 @@ const make = Effect.gen(function*() {
 							break
 						}
 					}
-				})
+				}).pipe(
+					defined(options.seed) ? Random.withSeed(options.seed) : identity
+				)
 			)
 			const solutions = yield* solver.solve(board, {
 				minWordLength: options.minWordLength

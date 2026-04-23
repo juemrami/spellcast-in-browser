@@ -86,7 +86,8 @@ export class LetterFrequencyAnalyzer extends Context.Service<LetterFrequencyAnal
 			return normalized
 		})
 		const distributedAlphabet = ENGLISH_ALPHABET_LOWER.flatMap((letter) =>
-			Array<EnglishLetterLower>(normalizedLetterFrequencies[letter] || 0).fill(letter)
+			// always include at least 1 of each letter
+			Array<EnglishLetterLower>(normalizedLetterFrequencies[letter] || 1).fill(letter)
 		)
 		return {
 			frequencies: {
