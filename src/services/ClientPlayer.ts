@@ -1,4 +1,5 @@
-import { Effect, Layer, pipe } from "effect"
+import { layerLocalStorage } from "@effect/platform-browser/BrowserKeyValueStore"
+import { Effect, Layer, pipe, Random, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
@@ -11,12 +12,27 @@ const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	return rowDiff <= 1 && colDiff <= 1
 }
 
+const makeDefaultPlayerName = (): string => {
+	return `Player-${Math.floor(Math.random() * 1000)}`
+}
+
+const PlayerIdentity = Schema.Struct({
+	id: Schema.String.pipe(Schema.check(Schema.isUUID(4))),
+	name: Schema.String
+}).pipe(Schema.fromJsonString)
+
+const localStorageAtomRuntime = Atom.runtime(layerLocalStorage)
+
+type AtomArg<Fn> = Fn extends Atom.AtomResultFn<infer Args, infer _, infer _> ? Args : never
 export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app/PlayerClientState", {
 	make: Effect.gen(function*() {
 		const selectionPath = Atom.make([] as Array<Tile>)
 		const { atom: currentGame, dispatch: actionDispatch } = yield* GameStateMachine
 		const { scoring: { isValidPath, getPathScore } } = yield* CurrentBoard
-		const useActionResult = <T extends Atom.FnContext>(get: T) => get.result(actionDispatch)
+		const useAction = Effect.fn(function*(get: Atom.FnContext, action: AtomArg<typeof actionDispatch>) {
+			get.set(actionDispatch, action)
+			return yield* get.result(actionDispatch)
+		})
 		const tryUpdateSelectionPath = Atom.fn(Effect.fn(function*(tile: Tile, get: Atom.FnContext) {
 			const path = get(selectionPath)
 			const tail = path.at(-1)
@@ -46,46 +62,23 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			get.set(selectionPath, [])
 		}))
 		const currentWordScore = Atom.make((get) => pipe(get(selectionPath), getPathScore))
-		const currentWord = Atom.make((ctx) => {
-			const path = ctx.get(selectionPath)
-			return path.map((tile) => tile!.letter).join("")
-		})
+		const currentWord = Atom.make((ctx) => ctx.get(selectionPath).map((tile) => tile!.letter).join(""))
 		const isCurrentWordValid = Atom.make((get) => isValidPath(get(selectionPath)))
 		const isMouseDown = Atom.make((get) => {
 			window.addEventListener("mousedown", () => get.setSelf(true))
 			window.addEventListener("mouseup", () => get.setSelf(false))
 			return false
 		})
-		type PlayerMeta = { id: string; name: string }
-		const upsertDefaultPlayerMeta = () => {
-			const defaultMeta = {
-				id: crypto.randomUUID(),
-				name: `Player-${Math.floor(Math.random() * 1000)}`
-			}
-			localStorage.setItem("playerMeta", JSON.stringify(defaultMeta))
-			return defaultMeta
-		}
-		const playerMeta = Atom.writable((ctx) => {
-			const getStored = () => {
-				const storedMeta = localStorage.getItem("playerMeta")
-				if (!storedMeta) return upsertDefaultPlayerMeta()
-				try {
-					const parsed = JSON.parse(storedMeta) as PlayerMeta
-					if (typeof parsed.id === "string" && typeof parsed.name === "string") {
-						return parsed
-					}
-					return upsertDefaultPlayerMeta()
-				} catch {
-					return upsertDefaultPlayerMeta()
-				}
-			}
-			const eventListener = () => ctx.setSelf(getStored())
-			window.addEventListener("storage", eventListener)
-			ctx.addFinalizer(() => window.removeEventListener("storage", eventListener))
-			return getStored()
-		}, (ctx, meta: PlayerMeta) => {
-			localStorage.setItem("playerMeta", JSON.stringify(meta))
-			ctx.setSelf(meta)
+		// note: doesnt subscribe to x-tab storage events
+		const playerMeta = Atom.kvs({
+			key: "playerMeta",
+			schema: PlayerIdentity,
+			defaultValue: () =>
+				Effect.runSync(Effect.gen(function*() {
+					const id = yield* Random.nextUUIDv4
+					return { id, name: makeDefaultPlayerName() }
+				})),
+			runtime: localStorageAtomRuntime
 		})
 		const playerName = Atom.writable((get) => {
 			const meta = get(playerMeta)
@@ -103,42 +96,35 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			let meta = get(playerMeta)
 			const trimmedName = meta.name.trim()
 			if (trimmedName.length === 0) {
-				const newName = `Player-${Math.floor(Math.random() * 1000)}`
+				const newName = makeDefaultPlayerName()
 				meta = { ...meta, name: newName }
 				get.set(playerMeta, meta)
 			}
-			get.set(currentGame, GameMatchAction.joinLobby({ player: meta }))
-			return yield* useActionResult(get)
+			return yield* useAction(get, GameMatchAction.joinLobby({ player: meta }))
 		}))
 		const playerId = Atom.readable((get) => get(playerMeta).id)
 		const setMatchConfig = Atom.fn(Effect.fn(function*(numRounds: "Three" | "Five" | "Seven", get: Atom.FnContext) {
-			const game = get(currentGame)
-			if (GameState.$is("Crashed")(game)) return false
-			get.set(currentGame, GameMatchAction.setMatchConfig({ numRounds }))
-			return yield* useActionResult(get)
+			return yield* useAction(get, GameMatchAction.setMatchConfig({ numRounds }))
 		}))
 		const resetMatch = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
-			const game = get(currentGame)
-			if (GameState.$is("Crashed")(game)) return false
-			get.set(currentGame, GameMatchAction.resetMatch())
-			return yield* useActionResult(get)
+			return yield* useAction(get, GameMatchAction.resetMatch())
 		}))
 		const startCurrentGame = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			const game = get(currentGame)
 			if (GameState.$is("Crashed")(game)) {
 				return false
 			}
-			get.set(
-				currentGame,
+			return yield* useAction(
+				get,
 				GameMatchAction.startRound({
 					config: {
 						turnDurationMs: 30000,
+						// todo: make optional and generate random turn order in state machine
 						turnOrder: game.snapshot.players.map((player) => player.id)
-						// boardSeed: crypto.randomUUID() //todo
+						// boardSeed: crypto.randomUUID() //todo: make optional seed config
 					}
 				})
 			)
-			return yield* useActionResult(get)
 		}))
 		const submitSelectionPath = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			const path = get(selectionPath)
@@ -148,24 +134,21 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				(game) =>
 					GameState.$is("Crashed")(game)
 						? Effect.die(new Error("Cannot submit word when game is crashed", { cause: game.cause }))
-						: pipe(
-							get.set(
-								currentGame,
-								GameMatchAction.submitWord({ path, playerId: get(playerId) })
-							),
-							() => useActionResult(get),
-							Effect.tapError(Effect.logError),
-							Effect.catchTags({
-								// todo: register errors with a toast atom backed system
-								"EmptyWordSubmitted": () => Effect.succeed(false),
-								"InvalidWordSubmitted": () => Effect.succeed(false)
-							})
-						)
+						: useAction(get, GameMatchAction.submitWord({ path, playerId: get(playerId) })),
+				Effect.tapError(Effect.logError),
+				Effect.catchTags({
+					// todo: register errors with a toast atom backed system
+					"EmptyWordSubmitted": () => Effect.succeed(false),
+					"InvalidWordSubmitted": () => Effect.succeed(false)
+				})
 			)
 		}))
-		// todo: localstorage persistence for this setting
-		// keepAlive to persist component unmounts
-		const autoSubmitOnValidPath = Atom.make(false).pipe(Atom.keepAlive)
+		const autoSubmitOnValidPath = Atom.kvs({
+			key: "autoSubmitOnValidPath",
+			schema: Schema.Boolean,
+			defaultValue: () => false,
+			runtime: localStorageAtomRuntime
+		})
 		const autoSubmitEffect = Atom.make(Effect.fn(function*(get: Atom.AtomContext) {
 			const enabled = get(autoSubmitOnValidPath)
 			if (!enabled) return
@@ -175,7 +158,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				get.set(submitSelectionPath, void 0)
 				yield* get.result(submitSelectionPath)
 			}
-		})).pipe(Atom.keepAlive)
+		})).pipe(Atom.keepAlive) // keepAlive to persist component unmounts
 		const isPlayerTurn = Atom.make((get) => {
 			const game = get(currentGame)
 			if (!isActiveTurnState(game)) return false
