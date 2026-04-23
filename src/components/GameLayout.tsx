@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-solid"
 import { Match } from "effect"
 import { type Component, createSignal, Show } from "solid-js"
 import { GameMatchState } from "../services/GameStateMachine"
-import { currentGameStateMachine } from "../services/layers"
+import { gameStateMachine } from "../services/layers"
 import DeveloperPanel from "./DeveloperPanel"
 import GameBoard from "./views/GameBoard"
 import Lobby from "./views/Lobby"
@@ -11,7 +11,7 @@ import RoundSummary from "./views/RoundSummary"
 const GameLayout: Component = () => {
 	// const tileCount = useAtomValue(() => boardService.atoms.tileCount)
 	const [isDeveloperPanelOpen, setDeveloperPanelOpen] = createSignal(false)
-	const currentGame = useAtomValue(() => currentGameStateMachine)
+	const currentGame = useAtomValue(() => gameStateMachine.atoms.state)
 
 	return (
 		<main class="relative min-h-screen overflow-hidden px-2 py-8 text-ink sm:px-4 lg:px-6">

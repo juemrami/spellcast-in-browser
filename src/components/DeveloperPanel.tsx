@@ -1,11 +1,11 @@
 // oxlint-disable no-console
-import { RegistryContext, useAtom, useAtomSet } from "@effect/atom-solid"
+import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { Effect, Exit, identity, Match, pipe } from "effect"
 import { AtomRegistry } from "effect/unstable/reactivity"
 import { type Component, For, useContext } from "solid-js"
 import type { BoggleSolutions } from "../services/BoggleSolver"
 import { GameMatchAction, GameMatchState } from "../services/GameStateMachine"
-import { boardService, clientPlayer, currentGameStateMachine } from "../services/layers"
+import { boardService, clientPlayer, gameStateMachine } from "../services/layers"
 
 const regenerateBoard = async () => {
 	try {
@@ -36,7 +36,10 @@ const solutions = () =>
 
 const DeveloperPanel: Component = () => {
 	const clearSelectionPath = useAtomSet(() => clientPlayer.atoms.selection.clear)
-	const [currentGameState, reduceGameState] = useAtom(() => currentGameStateMachine)
+	const [currentGameState, reduceGameState] = [
+		useAtomValue(() => gameStateMachine.atoms.state),
+		useAtomSet(() => gameStateMachine.atoms.reduce)
+	]
 	const matchState = () =>
 		Match.valueTags(currentGameState(), {
 			Active: ({ snapshot }) => snapshot,

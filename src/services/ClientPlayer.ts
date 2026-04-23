@@ -27,11 +27,11 @@ type AtomArg<Fn> = Fn extends Atom.AtomResultFn<infer Args, infer _, infer _> ? 
 export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app/PlayerClientState", {
 	make: Effect.gen(function*() {
 		const selectionPath = Atom.make([] as Array<Tile>)
-		const { atom: currentGame, dispatch: actionDispatch } = yield* GameStateMachine
+		const { atoms: { state: gameState, reduce: reduceGame } } = yield* GameStateMachine
 		const { scoring: { isValidPath, getPathScore } } = yield* CurrentBoard
-		const useAction = Effect.fn(function*(get: Atom.FnContext, action: AtomArg<typeof actionDispatch>) {
-			get.set(actionDispatch, action)
-			return yield* get.result(actionDispatch)
+		const useAction = Effect.fn(function*(get: Atom.FnContext, action: AtomArg<typeof reduceGame>) {
+			get.set(reduceGame, action)
+			return yield* get.result(reduceGame)
 		})
 		const tryUpdateSelectionPath = Atom.fn(Effect.fn(function*(tile: Tile, get: Atom.FnContext) {
 			const path = get(selectionPath)
@@ -110,7 +110,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			return yield* useAction(get, GameMatchAction.resetMatch())
 		}))
 		const startCurrentGame = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
-			const game = get(currentGame)
+			const game = get(gameState)
 			if (GameState.$is("Crashed")(game)) {
 				return false
 			}
@@ -130,7 +130,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			const path = get(selectionPath)
 			if (path.length === 0) return false
 			return yield* pipe(
-				get(currentGame),
+				get(gameState),
 				(game) =>
 					GameState.$is("Crashed")(game)
 						? Effect.die(new Error("Cannot submit word when game is crashed", { cause: game.cause }))
@@ -159,7 +159,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			}
 		}))
 		const isPlayerTurn = Atom.make((get) => {
-			const game = get(currentGame)
+			const game = get(gameState)
 			if (!isActiveTurnState(game)) return false
 			return game.snapshot.currentRound.currentTurn.playerId === get(playerId)
 		})
@@ -187,7 +187,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				},
 				isMouseDown,
 				game: {
-					state: currentGame,
+					state: gameState,
 					start: startCurrentGame,
 					joinLobby: joinCurrentGameLobby,
 					setConfig: setMatchConfig,

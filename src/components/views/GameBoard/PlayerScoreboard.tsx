@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-solid"
 import { type Component, createMemo, For, splitProps } from "solid-js"
 import { GameMatchState, GameState, MatchRoundState } from "../../../services/GameStateMachine"
-import { currentGameStateMachine } from "../../../services/layers"
+import { gameStateMachine } from "../../../services/layers"
 import TurnOrderBadge from "../../ui/TurnOrderBadge"
 
 // Ordered color palette for turn positions (rose, mint, sun, lavender)
@@ -14,7 +14,7 @@ const TURN_COLORS: ReadonlyArray<{ bg: string; border: string; text: string; dot
 
 const PlayerScoreboard: Component<{ class?: string }> = (props) => {
 	const [local, _rest] = splitProps(props, ["class"])
-	const currentGame = useAtomValue(() => currentGameStateMachine)
+	const currentGame = useAtomValue(() => gameStateMachine.atoms.state)
 
 	const rows = createMemo(() => {
 		const game = currentGame()

@@ -47,4 +47,4 @@ export const { gameContext } = await Effect.runPromise(createGameSession)
 
 export const boardService = Context.get(gameContext, BoardService.CurrentBoard)
 export const clientPlayer = Context.get(gameContext, ClientPlayerState)
-export const currentGameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine).atom
+export const gameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine)

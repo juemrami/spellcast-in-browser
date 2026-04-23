@@ -786,19 +786,39 @@ export const make = Effect.fn(
 			Effect.forkScoped
 		)
 		return {
-			atom: Atom.writable((get) => get(gameState), (ctx, action: GameMatchAction) => ctx.set(reduceFn, action)),
-			dispatch: reduceFn
+			atoms: {
+				state: Atom.readable((get) => get(gameState)),
+				reduce: reduceFn
+			}
 		}
 	}
 )
-
+class GameStateCrashed extends Data.TaggedError("GameStateCrashed")<{
+	readonly message: string
+	readonly cause: unknown
+}> {}
 /** Atom wrapped state machine for a single game/match */
 export class GameStateMachine extends Context.Service<
 	GameStateMachine,
 	Effect.Success<ReturnType<typeof make>>
 >()(
 	"host/GameStateMachine"
-) {}
+) {
+	static useGameState = <A, E, R>(
+		f: (state: Data.TaggedEnum.Value<GameState, "Active">) => Effect.Effect<A, E, R>
+	): Effect.Effect<A, E | GameStateCrashed, R | GameStateMachine | AtomRegistry.AtomRegistry> =>
+		this.use((service) =>
+			pipe(
+				Atom.get(service.atoms.state),
+				Effect.andThen((state) =>
+					GameState.$is("Active")(state)
+						? Effect.succeed(state)
+						: Effect.fail(new GameStateCrashed({ message: "Game state is not active", cause: state.cause }))
+				),
+				Effect.andThen(f)
+			)
+		)
+}
 
 type ActiveTurnGameState = Data.TaggedEnum.Value<GameState, "Active"> & {
 	snapshot: Data.TaggedEnum.Value<GameMatchState, "InRound"> & {
