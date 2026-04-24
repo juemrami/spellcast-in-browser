@@ -111,7 +111,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 		}))
 		const startCurrentGame = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			const game = get(gameState)
-			if (GameState.$is("Crashed")(game)) {
+			if (!GameState.$is("Active")(game)) {
 				return false
 			}
 			return yield* useAction(

@@ -134,6 +134,7 @@ export const GameMatchState = Object.assign(Data.taggedEnum<GameMatchState>(), {
 })
 
 export type GameState = Data.TaggedEnum<{
+	Idle: {}
 	Active: {
 		readonly snapshot: GameMatchState
 	}
@@ -697,7 +698,6 @@ export const make = Effect.fn(
 			HttpClientError
 		>
 	) {
-		const initialValue = yield* createInitialSnapshot
 		// todo: gameState should maybe not be initialized till the runtime is done (so that we have wordlist)
 		const gameState = Atom.kvs({
 			runtime,
@@ -714,7 +714,7 @@ export const make = Effect.fn(
 				)
 			),
 			key: `hostedGameState`,
-			defaultValue: () => GameState.Active({ snapshot: initialValue })
+			defaultValue: () => GameState.Idle()
 		})
 
 		const registry = yield* AtomRegistry.AtomRegistry
@@ -730,7 +730,7 @@ export const make = Effect.fn(
 		})))
 		const reduceFn = runtime.fn(Effect.fn(function*(action: GameMatchAction, get: Atom.FnContext) {
 			const current = get(gameState)
-			if (GameState.$is("Crashed")(current)) {
+			if (!GameState.$is("Active")(current)) {
 				return false
 			}
 			const next = yield* pipe(
@@ -813,7 +813,7 @@ export class GameStateMachine extends Context.Service<
 				Effect.andThen((state) =>
 					GameState.$is("Active")(state)
 						? Effect.succeed(state)
-						: Effect.fail(new GameStateCrashed({ message: "Game state is not active", cause: state.cause }))
+						: Effect.fail(new GameStateCrashed({ message: "Game state is not active", cause: undefined }))
 				),
 				Effect.andThen(f)
 			)
