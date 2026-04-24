@@ -1,26 +1,37 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-solid"
-import { Match } from "effect"
+import { Match, Option } from "effect"
 import { isNotUndefined } from "effect/Predicate"
 import type { Component } from "solid-js"
 import { router } from "../../App"
 import { GameMatchState, GameState } from "../../services/GameStateMachine"
-import { gameStateMachine } from "../../services/layers"
+import { gameSession, gameStateMachine } from "../../services/layers"
 
 const HomeScreen: Component = () => {
 	const mutateRouter = useAtomSet(() => router.mutate)
 	const currentGame = useAtomValue(() => gameStateMachine.atoms.state)
+	const activeSession = useAtomValue(() => gameSession.active)
+	const joinSession = useAtomSet(() => gameSession.join)
 	const matchInfo = () => {
+		if (Option.isNone(activeSession())) return undefined
 		const state = currentGame()
-		if (GameState.$is("Active")(state)) {
-			return GameMatchState.$match(state.snapshot, {
-				InLobby: (match) => `In Lobby (${match.players.length} players)`,
-				InRound: (match) => `Round ${match.currentRound.id} In Progress.`,
-				BetweenRounds: (match) => `Waiting for next round... (${match.lastRound.id} complete)`,
-				MatchRecap: () => `View final scores.`
-			})
-		} else {
-			return undefined
-		}
+		if (!GameState.$is("Active")(state)) return undefined
+		return GameMatchState.$match(state.snapshot, {
+			InLobby: (match) => `In Lobby (${match.players.length} players)`,
+			InRound: (match) => `Round ${match.currentRound.id} In Progress.`,
+			BetweenRounds: (match) => `Waiting for next round... (${match.lastRound.id} complete)`,
+			MatchRecap: () => `View final scores.`
+		})
+	}
+	const onJoinLobby = (lobbyId?: string) => {
+		const id = lobbyId ?? crypto.randomUUID().slice(0, 6)
+		joinSession(id)
+		mutateRouter({
+			mutation: (url) => {
+				url.searchParams.set("lobby", id)
+				url.pathname = "/match"
+			},
+			pushHistory: true
+		})
 	}
 	return (
 		<div class="flex flex-col items-stretch gap-5 p-3 pt-5 sm:gap-6 sm:p-5 w-full max-w-100">
@@ -28,17 +39,7 @@ const HomeScreen: Component = () => {
 			<button
 				type="button"
 				class="group relative overflow-hidden rounded-2xl border border-tile-multiplier-border bg-gradient-to-b from-tile-multiplier-from via-tile-multiplier-via to-tile-multiplier-to px-4 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:shadow-sm"
-				onClick={() => {
-					mutateRouter({
-						mutation: (url) => {
-							url.pathname = "/match"
-							if (!matchInfo()) {
-								url.searchParams.set("new", "true")
-							}
-						},
-						pushHistory: true
-					})
-				}}
+				onClick={() => onJoinLobby()}
 			>
 				<div class="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 bg-gradient-to-b from-tile-multiplier-hover-from via-tile-multiplier-hover-via to-tile-multiplier-hover-to" />
 				<div class="relative z-10 flex flex-col items-center gap-1.5">

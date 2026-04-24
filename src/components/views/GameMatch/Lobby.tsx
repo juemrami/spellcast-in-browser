@@ -2,8 +2,9 @@ import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-solid"
 import type { Component } from "solid-js"
 import { For } from "solid-js"
 
+import { Option, pipe } from "effect"
 import { type LobbyPlayer, MIN_PLAYERS } from "../../../services/GameStateMachine"
-import { clientPlayer } from "../../../services/layers"
+import { clientPlayer, gameSession } from "../../../services/layers"
 
 interface LobbyProps {
 	readonly players: ReadonlyArray<LobbyPlayer>
@@ -17,7 +18,7 @@ const Lobby: Component<LobbyProps> = (props) => {
 	const [playerName, setPlayerName] = useAtom(() => clientPlayer.atoms.player.name)
 	const playerId = useAtomValue(() => clientPlayer.atoms.player.id)
 	const isInLobby = () => props.players.some((player) => player.id === playerId())
-
+	const peers = useAtomValue(() => gameSession.peers)
 	return (
 		<form
 			class="flex w-full flex-col items-center gap-5"
@@ -33,6 +34,13 @@ const Lobby: Component<LobbyProps> = (props) => {
 			<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-label">
 				Waiting for players to join...
 			</p>
+			<div>
+				{pipe(
+					peers(),
+					Option.map((p) => Array.from(p.values()).map((p) => p.id)),
+					Option.getOrUndefined
+				)}
+			</div>
 			<div class="flex w-full flex-col gap-2 text-left">
 				<span class="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-label-soft">
 					Match format

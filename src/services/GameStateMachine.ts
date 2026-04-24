@@ -101,6 +101,7 @@ export type MatchRoundState = Data.TaggedEnum<{
 export const MatchRoundState = Data.taggedEnum<MatchRoundState>()
 
 type BaseMatch = {
+	/** todo: rename to lobbyId */
 	readonly matchId: string
 	readonly createdAt: number
 	readonly players: ReadonlyArray<LobbyPlayer>
@@ -136,6 +137,9 @@ export const GameMatchState = Object.assign(Data.taggedEnum<GameMatchState>(), {
 export type GameState = Data.TaggedEnum<{
 	Idle: {}
 	Active: {
+		readonly lobby: {
+			id: string
+		}
 		readonly snapshot: GameMatchState
 	}
 	Crashed: {
@@ -145,16 +149,6 @@ export type GameState = Data.TaggedEnum<{
 export const GameState = Data.taggedEnum<GameState>()
 
 const omitTag = <T extends { _tag: string }>(obj: T): Omit<T, "_tag"> => Struct.omit(obj, ["_tag"])
-const createInitialSnapshot = Effect.gen(function*() {
-	return GameMatchState.InLobby({
-		matchId: yield* Random.nextUUIDv4,
-		createdAt: Date.now(),
-		players: [],
-		config: {
-			numRounds: 3
-		}
-	})
-})
 
 const upsertPlayer = (
 	players: ReadonlyArray<LobbyPlayer>,
@@ -676,11 +670,15 @@ export const reduceGameState = (
 					}),
 				resetMatch: () =>
 					Effect.gen(function*() {
-						const initial = yield* createInitialSnapshot
-						return yield* updateSnapshot({
-							...initial,
-							matchId: state.matchId // preserve match ID on reset
-						})
+						return yield* updateSnapshot(
+							GameMatchState.InLobby({
+								...state,
+								createdAt: Date.now(),
+								config: {
+									numRounds: 3
+								}
+							})
+						)
 					})
 			}),
 			Effect.provideService(TransitionMatchStateRef, snapshotRef),
@@ -705,7 +703,8 @@ export const make = Effect.fn(
 				Schema.String,
 				Schema.decodeTo(
 					Schema.declare<GameState>((u: unknown): u is GameState =>
-						typeof u === "object" && u !== null && GameState.$is("Active")(u) || GameState.$is("Crashed")(u)
+						typeof u === "object" && u !== null && GameState.$is("Active")(u) || GameState.$is("Crashed")(u) ||
+						GameState.$is("Idle")(u)
 					),
 					{
 						decode: SchemaGetter.transform((str) => JSON.parse(str) as GameState),
@@ -730,27 +729,39 @@ export const make = Effect.fn(
 		})))
 		const reduceFn = runtime.fn(Effect.fn(function*(action: GameMatchAction, get: Atom.FnContext) {
 			const current = get(gameState)
-			if (!GameState.$is("Active")(current)) {
-				return false
-			}
-			const next = yield* pipe(
-				reduceGameState(current.snapshot, action),
-				Effect.map((nextSnapshot) => {
-					return current.snapshot !== nextSnapshot
-						? GameState.Active({ snapshot: nextSnapshot })
-						: current
-				}),
-				Effect.tapError((e) =>
-					Effect.logWarning(`Error processing game state transition for action ${action._tag}`, e)
-				),
-				Effect.catchTags({
-					// handle crash state errors by transitioning to Crashed state with error info
-					// "InvalidStateTransition": (e) => GameState.Crashed({ cause: e }),
-					// uncaught errors will bubble up to AsyncResult of the reduceFn atom
-				})
-			)
-			get.set(gameState, next)
-			return true
+			return yield* GameState.$match(current, {
+				Idle: () =>
+					pipe(
+						Effect.logWarning(`Received action ${action._tag} but game is in Idle state, ignoring action`),
+						() => Effect.succeed(false)
+					),
+				Active: ({ lobby, snapshot }) =>
+					Effect.gen(function*() {
+						const next = yield* pipe(
+							reduceGameState(snapshot, action),
+							Effect.map((nextSnapshot) => {
+								return snapshot !== nextSnapshot
+									? GameState.Active({ lobby, snapshot: nextSnapshot })
+									: current
+							}),
+							Effect.tapError((e) =>
+								Effect.logWarning(`Error processing game state transition for action ${action._tag}`, e)
+							),
+							Effect.catchTags({
+								// handle crash state errors by transitioning to Crashed state with error info
+								// "InvalidStateTransition": (e) => GameState.Crashed({ cause: e }),
+								// uncaught errors will bubble up to AsyncResult of the reduceFn atom
+							})
+						)
+						get.set(gameState, next)
+						return true
+					}),
+				Crashed: () =>
+					pipe(
+						Effect.logWarning(`Received action ${action._tag} but game is in Crashed state, ignoring action`),
+						() => Effect.succeed(false)
+					)
+			})
 		}))
 
 		yield* pipe(
@@ -787,6 +798,8 @@ export const make = Effect.fn(
 		)
 		return {
 			atoms: {
+				// hack for startGame. todo fix.
+				raw: gameState,
 				state: Atom.readable((get) => get(gameState)),
 				reduce: reduceFn
 			}
@@ -804,6 +817,44 @@ export class GameStateMachine extends Context.Service<
 >()(
 	"host/GameStateMachine"
 ) {
+	static startGame = Effect.fn(function*(lobbyId: string) {
+		const machine = yield* GameStateMachine
+		const gameState = yield* Atom.get(machine.atoms.raw)
+		const start = Atom.set(
+			machine.atoms.raw,
+			GameState.Active({
+				lobby: { id: lobbyId },
+				snapshot: GameMatchState.InLobby({
+					config: { numRounds: 3 },
+					matchId: lobbyId,
+					createdAt: Date.now(),
+					players: []
+				})
+			})
+		)
+		yield* GameState.$match(gameState, {
+			Active: (_) =>
+				pipe(
+					Effect.logError(`Game machine is already active cannot start game`),
+					Effect.map(() => false)
+				),
+			Crashed: ({ cause }) =>
+				pipe(
+					Effect.log(`Restarting game machine from crashed state for lobby ${lobbyId}`, cause),
+					Effect.andThen(() => start)
+				),
+			Idle: () =>
+				pipe(
+					Effect.log(`Starting game machine for lobby ${lobbyId}`),
+					Effect.andThen(() => start)
+				)
+		})
+		yield* Effect.void
+	})
+	static clearGame = Effect.fn(function*() {
+		const machine = yield* GameStateMachine
+		yield* Atom.set(machine.atoms.raw, GameState.Idle())
+	})
 	static useGameState = <A, E, R>(
 		f: (state: Data.TaggedEnum.Value<GameState, "Active">) => Effect.Effect<A, E, R>
 	): Effect.Effect<A, E | GameStateCrashed, R | GameStateMachine | AtomRegistry.AtomRegistry> =>

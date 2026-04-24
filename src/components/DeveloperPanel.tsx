@@ -45,7 +45,7 @@ const DeveloperPanel: Component = () => {
 	]
 	const matchState = () =>
 		Match.valueTags(currentGameState(), {
-			Idle: (_) => undefined,
+			Idle: () => undefined,
 			Active: ({ snapshot }) => snapshot,
 			Crashed: (_) => undefined
 		})

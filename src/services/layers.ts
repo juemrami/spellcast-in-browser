@@ -11,6 +11,7 @@ import { useContext } from "solid-js"
 import { ClientPlayerState } from "./ClientPlayer"
 import * as BoardService from "./CurrentBoard"
 import * as GameStateMachine from "./GameStateMachine"
+import { P2PSessionManager } from "./P2PSession"
 import { WordList } from "./WordList"
 
 const scope = Scope.makeUnsafe()
@@ -29,12 +30,16 @@ const createGameSession = Effect.gen(function*() {
 	const GameHostLayer = Layer.effect(GameStateMachine.GameStateMachine, makeStateMachine)
 	const GameLayer = pipe(
 		ClientPlayerState.layerFresh,
+		Layer.provideMerge(P2PSessionManager.layer),
 		Layer.provideMerge(GameHostLayer),
 		Layer.provideMerge(AtomRuntimeLayer)
 	)
+
+	const gameContext = yield* Layer.buildWithMemoMap(GameLayer, memoMap, scope)
+
 	return {
-		memoMap: memoMap,
-		gameContext: yield* Layer.buildWithMemoMap(GameLayer, memoMap, scope),
+		memoMap,
+		gameContext,
 		closeGame: () => {
 			Scope.close(scope, Exit.succeed(undefined))
 		}
@@ -48,3 +53,4 @@ export const { gameContext } = await Effect.runPromise(createGameSession)
 export const boardService = Context.get(gameContext, BoardService.CurrentBoard)
 export const clientPlayer = Context.get(gameContext, ClientPlayerState)
 export const gameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine)
+export const gameSession = Context.get(gameContext, P2PSessionManager)
