@@ -66,7 +66,7 @@ export class TrysteroRoom extends Context.Service<TrysteroRoom>()(
 				try: () => joinRoom(...options.args),
 				catch: (error) => {
 					console.error("Failed to join room", { cause: error })
-					throw new TrysteroJoinRoomError({ message: "Failed to join room", cause: error })
+					return Effect.fail(new TrysteroJoinRoomError({ message: "Failed to join room", cause: error }))
 				}
 			})
 			yield* Effect.log("Joined room with ID: " + options.args[1])

@@ -2,6 +2,7 @@ import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { Match, Option } from "effect"
 import { isNotUndefined } from "effect/Predicate"
 import type { Component } from "solid-js"
+import { createSignal } from "solid-js"
 import { router } from "../../App"
 import { GameMatchState, GameState } from "../../services/GameStateMachine"
 import { gameSession, gameStateMachine } from "../../services/layers"
@@ -22,6 +23,7 @@ const HomeScreen: Component = () => {
 			MatchRecap: () => `View final scores.`
 		})
 	}
+	const [joinCode, setJoinCode] = createSignal("")
 	const onJoinLobby = (lobbyId?: string) => {
 		const id = lobbyId ?? crypto.randomUUID().slice(0, 6)
 		joinSession(id)
@@ -33,6 +35,15 @@ const HomeScreen: Component = () => {
 			pushHistory: true
 		})
 	}
+
+	const tryJoinLobby = (event: Event) => {
+		event.preventDefault()
+		const id = joinCode().trim()
+		if (!id) return
+		onJoinLobby(id)
+		setJoinCode("")
+	}
+
 	return (
 		<div class="flex flex-col items-stretch gap-5 p-3 pt-5 sm:gap-6 sm:p-5 w-full max-w-100">
 			{/* Create Game — hero action, mint/multiplier palette */}
@@ -56,20 +67,43 @@ const HomeScreen: Component = () => {
 			</button>
 
 			{/* Join Game — secondary action, amber/control palette */}
-			<button
-				type="button"
-				disabled
-				class="group relative overflow-hidden rounded-2xl border border-control-border bg-gradient-to-b from-control-from to-control-to px-4 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
+			<form
+				onSubmit={tryJoinLobby}
+				class="relative overflow-hidden rounded-2xl border border-control-border bg-gradient-to-b from-control-from to-control-to px-4 py-4 shadow-sm"
 			>
-				<div class="relative z-10 flex flex-col items-center gap-1">
-					<span class="font-display text-xl font-bold tracking-tight text-control-text">
-						Join Game
-					</span>
-					<span class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-control-text/50">
+				<div class="relative z-10 flex flex-col gap-3">
+					<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+						<div>
+							<span class="font-display text-xl font-bold tracking-tight text-[#3B2A12]">
+								Join Game
+							</span>
+						</div>
+						<div class="flex flex-1 items-center gap-2">
+							<label class="sr-only" for="lobby-code-input">
+								Lobby code
+							</label>
+							<input
+								id="lobby-code-input"
+								type="text"
+								value={joinCode()}
+								onInput={(event) => setJoinCode(event.currentTarget.value)}
+								placeholder="Lobby code"
+								class="flex-1 rounded-2xl border border-control-border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-control-text focus:ring-2 focus:ring-control-text/20"
+							/>
+							<button
+								type="submit"
+								class="rounded-2xl bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={!joinCode().trim()}
+							>
+								Join
+							</button>
+						</div>
+					</div>
+					<span class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#5F3A10]">
 						Enter with a code
 					</span>
 				</div>
-			</button>
+			</form>
 		</div>
 	)
 }
