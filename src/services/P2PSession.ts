@@ -1,5 +1,6 @@
 import { Context, Effect, Layer, Option } from "effect"
 import { Atom } from "effect/unstable/reactivity"
+import { selfId } from "trystero"
 import { GameStateMachine } from "./GameStateMachine"
 import { TrysteroRoom } from "./Trystero"
 
@@ -29,8 +30,6 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 					],
 					actions: {}
 				})
-				// Reset the machine to a fresh InLobby state for this session
-				yield* GameStateMachine.startGame(lobbyId)
 				get.set(active, Option.some({ room, lobbyId }))
 			}, Effect.provideService(GameStateMachine, machine)))
 
@@ -46,7 +45,7 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 				const session = get(active)
 				return Option.map(session, (s) => get(s.room.atoms.peers))
 			})
-			return { active, join, leave, peers }
+			return { userPeerId: selfId, active, join, leave, peers }
 		})
 	}
 ) {

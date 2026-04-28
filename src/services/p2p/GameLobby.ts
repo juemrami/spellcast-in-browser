@@ -1,0 +1,220 @@
+import { RegistryContext } from "@effect/atom-solid/RegistryContext"
+import { Context, Data, Effect, Layer, Option, pipe, Random } from "effect"
+import { Atom, AtomRegistry } from "effect/unstable/reactivity"
+import { useContext } from "solid-js"
+import { ClientPlayerState } from "../ClientPlayer"
+import { MIN_PLAYERS } from "../GameStateMachine"
+import { P2PSessionManager } from "../P2PSession"
+
+/** Frozen snapshot of lobby state at match start time. Immutable once created. */
+export interface MatchSnapshot {
+	readonly matchId: string
+	readonly createdAt: number
+	readonly players: ReadonlyArray<{ readonly id: string; readonly name: string }>
+	readonly config: { readonly numRounds: 3 | 5 | 7 }
+	readonly seed: number
+	readonly turnOrder: ReadonlyArray<string>
+}
+/**
+ * Represents a peer's current state in the lobby.
+ * Ephemeral coordination data, not part of the frozen match.
+ */
+export interface LobbyPeerState {
+	readonly id: string
+	readonly name: string
+	readonly ready: boolean
+	readonly joinedAt: number
+}
+class NotEnoughReadyPlayers extends Data.TaggedError("NotEnoughReadyPlayers")<{
+	readonly message: string
+}> {}
+class MissingP2PSession extends Data.TaggedError("MissingP2PSession")<{
+	readonly message: string
+}> {}
+
+const withSolidAtomContext = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+	pipe(
+		effect,
+		Effect.provideService(AtomRegistry.AtomRegistry, useContext(RegistryContext))
+	)
+/**
+ * LobbyManager owns ephemeral lobby coordination concerns:
+ * - Peer list tracking from Trystero room
+ * - Player metadata (names, ready state)
+ * - Match configuration (numRounds, turnOrder)
+ * - Freeze logic that produces deterministic MatchSnapshot
+ *
+ * Once frozen, the snapshot is immutable and used to initialize the match state machine.
+ */
+export const make = Effect.gen(function*() {
+	// Track peers in lobby
+	const user = yield* ClientPlayerState
+	const p2pSession = yield* P2PSessionManager
+	// if (pipe(yield* Atom.get(p2pSession.active), Option.isNone)) {
+	// 	return yield* new MissingP2PSession({ message: "Cannot initialize lobby: no active P2P session" })
+	// }
+	const makeDefaultPeerState = (peerId: string, name?: string): LobbyPeerState => ({
+		id: peerId,
+		name: `Player-${p2pSession.userPeerId.slice(0, 6)}`,
+		ready: true,
+		joinedAt: Date.now()
+	})
+	// Local player metadata (mutable while in lobby)
+	const userPeerState = Atom.writable((get) => {
+		const name = get(user.atoms.playerName)
+		const existing = get.self<LobbyPeerState>().pipe(
+			Option.getOrElse<LobbyPeerState>(() => makeDefaultPeerState(p2pSession.userPeerId, name))
+		)
+		if (name !== existing.name || existing.id !== p2pSession.userPeerId) {
+			return {
+				...existing,
+				name,
+				id: p2pSession.userPeerId
+			}
+		} else {
+			return existing
+		}
+	}, (ctx, ready: boolean) => {
+		const current = ctx.get(userPeerState)
+		ctx.setSelf({ ...current, ready })
+	})
+
+	// Match configuration (mutable while in lobby)
+	const matchConfig = Atom.make<{
+		numRounds: 3 | 5 | 7
+	}>({
+		numRounds: 3
+	})
+
+	// Atom-based reactivity for UI
+	const lobbyPeerStates = Atom.make((get) => {
+		const trysteroPeers = get(p2pSession.peers).pipe(Option.getOrUndefined)
+		if (trysteroPeers === undefined) {
+			return new Map<string, LobbyPeerState>()
+		}
+		return pipe(
+			get.self<Map<string, LobbyPeerState>>(),
+			Option.map((existing) => {
+				// Build a new map based on Trystero peers, preserving existing metadata
+				const existingMap = existing
+				const peerIds: string[] = Array.from(trysteroPeers.keys())
+				const updated = new Map<string, LobbyPeerState>()
+				for (const id of peerIds) {
+					const prev = existingMap.get(id)
+					if (prev) {
+						updated.set(id, prev)
+					} else {
+						updated.set(id, makeDefaultPeerState(id))
+					}
+				}
+				return updated
+			}),
+			Option.getOrElse(() => new Map<string, LobbyPeerState>())
+		)
+	})
+
+	const isReadyAtom = Atom.make((get) => {
+		const local = get(userPeerState)
+		const peers = get(lobbyPeerStates)
+		const peersArray = Array.from(peers.values())
+		const allPeersReady = peersArray.every((p) => p.ready)
+		return peersArray.length >= MIN_PLAYERS && local.ready && allPeersReady
+	})
+
+	/**
+	 * Freeze lobby into immutable MatchSnapshot.
+	 * Only host can call this. Validates:
+	 * - At least MIN_PLAYERS ready
+	 * - All participants have valid names
+	 * - Match config is valid
+	 */
+	const freeze = Effect.gen(function*() {
+		const peers = yield* Atom.get(lobbyPeerStates)
+		const local = yield* Atom.get(userPeerState)
+		const config = yield* Atom.get(matchConfig)
+
+		// Validate ready state
+		const readyPeers = Array.from(peers.values()).filter((p) => p.ready)
+		const allReady = local.ready && readyPeers.length >= MIN_PLAYERS
+		if (!allReady) {
+			return yield* new NotEnoughReadyPlayers({
+				message: `Cannot freeze lobby: need ${MIN_PLAYERS} ready players, have ${readyPeers.length + 1}`
+			})
+		}
+
+		// Collect all players (local + peers)
+		const allPlayers = [
+			local,
+			...readyPeers
+		]
+
+		// Derive deterministic turn order by sorting player IDs
+		// This ensures all peers independently derive the same order
+		const turnOrder = allPlayers
+			.map((p) => p.id)
+			.sort() // deterministic order
+
+		// Generate seed for board generation
+		const seed = yield* Random.nextInt
+
+		// Build immutable snapshot
+		const snapshot: MatchSnapshot = {
+			matchId: `match-${Date.now()}-${local.id.slice(0, 6)}`,
+			createdAt: Date.now(),
+			players: allPlayers.map((p) => ({
+				id: p.id,
+				name: p.name
+			})),
+			config,
+			seed,
+			turnOrder
+		}
+
+		return snapshot
+	})
+	const setUserPlayerName = (name: string) =>
+		pipe(
+			Atom.set(user.atoms.playerName, name),
+			withSolidAtomContext
+		)
+
+	/**
+	 * Set local player ready state
+	 */
+	const setUserPlayerReady = (ready: boolean) =>
+		pipe(
+			Atom.set(userPeerState, ready),
+			withSolidAtomContext
+		)
+
+	/**
+	 * Set peer ready state (from P2P message in real implementation)
+	 * todo
+	 */
+	const setPeerPlayerReady = (peerId: string, ready: boolean) => Effect.void
+
+	return {
+		atoms: {
+			peers: lobbyPeerStates,
+			user: userPeerState,
+			allPlayers: Atom.readable((get) => {
+				const local = get(userPeerState)
+				const peers = get(lobbyPeerStates)
+				return [local, ...Array.from(peers.values())]
+			}),
+			matchConfig: matchConfig,
+			isReady: isReadyAtom
+		},
+		freeze,
+		setLocalPlayerName: setUserPlayerName,
+		setLocalPlayerReady: setUserPlayerReady,
+		setPeerReady: setPeerPlayerReady
+	}
+})
+
+export class GameLobby extends Context.Service<GameLobby>()(
+	"GameLobby",
+	{ make: make }
+) {
+	static layer = Layer.effect(this, this.make.pipe(withSolidAtomContext))
+}

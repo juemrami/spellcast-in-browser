@@ -4,7 +4,7 @@ import { router } from "../../../App"
 import { GameMatchState } from "../../../services/GameStateMachine"
 import { gameSession, gameStateMachine } from "../../../services/layers"
 import GameBoard from "./GameBoard"
-import Lobby from "./Lobby"
+import Lobby from "../Lobby"
 import RoundSummary from "./RoundSummary"
 
 export default function GameMatch() {
@@ -22,7 +22,7 @@ export default function GameMatch() {
 					},
 					Active: ({ snapshot }) =>
 						GameMatchState.$match(snapshot, {
-							InLobby: (state) => <Lobby players={state.players} config={state.config} />,
+							InLobby: (state) => <Lobby />,
 							InRound: (state) => <GameBoard state={state} />,
 							BetweenRounds: (state) => <RoundSummary state={state} />,
 							MatchRecap: (state) => <RoundSummary state={state} />

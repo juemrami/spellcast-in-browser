@@ -29,8 +29,8 @@ const HomeScreen: Component = () => {
 		joinSession(id)
 		mutateRouter({
 			mutation: (url) => {
-				url.searchParams.set("lobby", id)
-				url.pathname = "/match"
+				url.searchParams.set("id", id)
+				url.pathname = "/lobby"
 			},
 			pushHistory: true
 		})

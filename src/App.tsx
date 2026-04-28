@@ -4,6 +4,7 @@ import type { Component } from "solid-js"
 import SiteLayout from "./components/Layout"
 import GameMatch from "./components/views/GameMatch"
 import HomeScreen from "./components/views/HomeScreen"
+import Lobby from "./components/views/Lobby"
 import { GameState } from "./services/GameStateMachine"
 import { gameStateMachine } from "./services/layers"
 import { TypedSpaRouter } from "./services/SpaAtomRouter"
@@ -14,7 +15,8 @@ export const router = Effect.runSync(TypedSpaRouter.make({
 			route: "/",
 			aliases: ["/home"]
 		},
-		{ route: "/match", aliases: [] }
+		{ route: "/match", aliases: [] },
+		{ route: "/lobby", aliases: [] }
 	]
 }))
 
@@ -37,6 +39,7 @@ const App: Component = () => {
 							return <HomeScreen />
 						}),
 						Match.when("/match", () => <GameMatch />),
+						Match.when("/lobby", () => <Lobby />),
 						Match.exhaustive
 					)
 				},

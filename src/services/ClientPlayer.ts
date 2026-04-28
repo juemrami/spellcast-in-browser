@@ -1,5 +1,5 @@
 import { layerLocalStorage } from "@effect/platform-browser/BrowserKeyValueStore"
-import { Effect, Layer, pipe, Random, Schema } from "effect"
+import { Effect, Layer, pipe, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
@@ -22,10 +22,31 @@ const PlayerIdentity = Schema.Struct({
 }).pipe(Schema.fromJsonString)
 
 const localStorageAtomRuntime = Atom.runtime(layerLocalStorage)
+/** Reactive browser runtime saved user variables */
+export class SavedUserConfig extends Context.Service<SavedUserConfig>()(
+	"app/UserConfig",
+	{
+		make: Effect.gen(function*() {
+			const name = Atom.kvs({
+				key: "user:name",
+				schema: Schema.String,
+				runtime: localStorageAtomRuntime,
+				defaultValue: makeDefaultPlayerName
+			})
+
+			return {
+				atoms: {
+					name: name
+				}
+			}
+		})
+	}
+) {}
 
 type AtomArg<Fn> = Fn extends Atom.AtomResultFn<infer Args, infer _, infer _> ? Args : never
 export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app/PlayerClientState", {
 	make: Effect.gen(function*() {
+		const user = yield* SavedUserConfig
 		const selectionPath = Atom.make([] as Array<Tile>)
 		const { atoms: { state: gameState, reduce: reduceGame } } = yield* GameStateMachine
 		const { scoring: { isValidPath, getPathScore } } = yield* CurrentBoard
@@ -69,40 +90,8 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			window.addEventListener("mouseup", () => get.setSelf(false))
 			return false
 		})
-		// note: doesnt subscribe to x-tab storage events
-		const playerMeta = Atom.kvs({
-			key: "playerMeta",
-			schema: PlayerIdentity,
-			defaultValue: () =>
-				Effect.runSync(Effect.gen(function*() {
-					const id = yield* Random.nextUUIDv4
-					return { id, name: makeDefaultPlayerName() }
-				})),
-			runtime: localStorageAtomRuntime
-		})
-		const playerName = Atom.writable((get) => {
-			const meta = get(playerMeta)
-			return meta.name
-		}, (ctx, name: string) => {
-			const trimmedName = name.trim()
-			if (trimmedName.length === 0) {
-				return
-			}
-			const meta = { ...ctx.get(playerMeta), name: trimmedName }
-			ctx.set(playerMeta, meta)
-			ctx.setSelf(trimmedName)
-		})
-		const joinCurrentGameLobby = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
-			let meta = get(playerMeta)
-			const trimmedName = meta.name.trim()
-			if (trimmedName.length === 0) {
-				const newName = makeDefaultPlayerName()
-				meta = { ...meta, name: newName }
-				get.set(playerMeta, meta)
-			}
-			return yield* useAction(get, GameMatchAction.joinLobby({ player: meta }))
-		}))
-		const playerId = Atom.readable((get) => get(playerMeta).id)
+		const playerName = user.atoms.name
+
 		const setMatchConfig = Atom.fn(Effect.fn(function*(numRounds: "Three" | "Five" | "Seven", get: Atom.FnContext) {
 			return yield* useAction(get, GameMatchAction.setMatchConfig({ numRounds }))
 		}))
@@ -134,7 +123,10 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				(game) =>
 					GameState.$is("Crashed")(game)
 						? Effect.die(new Error("Cannot submit word when game is crashed", { cause: game.cause }))
-						: useAction(get, GameMatchAction.submitWord({ path, playerId: get(playerId) })),
+						: useAction(
+							get,
+							GameMatchAction.submitWord({ path, playerId: get(user.atoms.name) })
+						),
 				Effect.tapError(Effect.logError),
 				Effect.catchTags({
 					// todo: register errors with a toast atom backed system
@@ -161,14 +153,11 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 		const isPlayerTurn = Atom.make((get) => {
 			const game = get(gameState)
 			if (!isActiveTurnState(game)) return false
-			return game.snapshot.currentRound.currentTurn.playerId === get(playerId)
+			return game.snapshot.currentRound.currentTurn.playerId === get(user.atoms.name)
 		})
 		return {
 			atoms: {
-				player: {
-					name: playerName,
-					id: playerId
-				},
+				playerName,
 				autoSubmit: Atom.writable(
 					(get) => {
 						get.mount(autoSubmitEffect)
@@ -186,11 +175,12 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 					submit: submitSelectionPath
 				},
 				isMouseDown,
+				lobby: {
+					setConfig: setMatchConfig
+				},
 				game: {
 					state: gameState,
 					start: startCurrentGame,
-					joinLobby: joinCurrentGameLobby,
-					setConfig: setMatchConfig,
 					reset: resetMatch
 				},
 				isPlayerTurn

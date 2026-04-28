@@ -8,9 +8,10 @@ import { Exit, Scope } from "effect"
 import { pipe } from "effect/Function"
 import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
-import { ClientPlayerState } from "./ClientPlayer"
+import { ClientPlayerState, SavedUserConfig } from "./ClientPlayer"
 import * as BoardService from "./CurrentBoard"
 import * as GameStateMachine from "./GameStateMachine"
+import { GameLobby } from "./p2p/GameLobby"
 import { P2PSessionManager } from "./P2PSession"
 import { WordList } from "./WordList"
 
@@ -22,17 +23,18 @@ const createGameSession = Effect.gen(function*() {
 	const BrowserKvsLayer = layerLocalStorage
 	const atomRuntime = Atom.context({ memoMap })(Layer.mergeAll(BoardLayer, BrowserKvsLayer))
 	const AtomRuntimeLayer = yield* Atom.get(atomRuntime.layer)
-
 	const makeStateMachine = pipe(
 		GameStateMachine.make(atomRuntime),
 		Effect.provideService(Scope.Scope, scope)
 	)
 	const GameHostLayer = Layer.effect(GameStateMachine.GameStateMachine, makeStateMachine)
 	const GameLayer = pipe(
-		ClientPlayerState.layerFresh,
+		GameLobby.layer,
+		Layer.provideMerge(ClientPlayerState.layerFresh),
 		Layer.provideMerge(P2PSessionManager.layer),
 		Layer.provideMerge(GameHostLayer),
-		Layer.provideMerge(AtomRuntimeLayer)
+		Layer.provideMerge(AtomRuntimeLayer),
+		Layer.provideMerge(Layer.effect(SavedUserConfig, SavedUserConfig.make))
 	)
 
 	const gameContext = yield* Layer.buildWithMemoMap(GameLayer, memoMap, scope)
@@ -54,3 +56,4 @@ export const boardService = Context.get(gameContext, BoardService.CurrentBoard)
 export const clientPlayer = Context.get(gameContext, ClientPlayerState)
 export const gameStateMachine = Context.get(gameContext, GameStateMachine.GameStateMachine)
 export const gameSession = Context.get(gameContext, P2PSessionManager)
+export const lobbyContext = Context.get(gameContext, GameLobby)

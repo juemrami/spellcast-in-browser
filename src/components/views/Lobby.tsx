@@ -3,34 +3,45 @@ import type { Component } from "solid-js"
 import { For } from "solid-js"
 
 import { Option, pipe } from "effect"
-import { type LobbyPlayer, MIN_PLAYERS } from "../../../services/GameStateMachine"
-import { clientPlayer, gameSession } from "../../../services/layers"
+import { router } from "../../App"
+import { MIN_PLAYERS } from "../../services/GameStateMachine"
+import { clientPlayer, gameSession, lobbyContext } from "../../services/layers"
 
-interface LobbyProps {
-	readonly players: ReadonlyArray<LobbyPlayer>
-	readonly config: { numRounds: 3 | 5 | 7 }
-}
-
-const Lobby: Component<LobbyProps> = (props) => {
-	const joinLobby = useAtomSet(() => clientPlayer.atoms.game.joinLobby)
-	const setMatchConfig = useAtomSet(() => clientPlayer.atoms.game.setConfig)
+const Lobby: Component = () => {
+	// const joinLobby = useAtomSet(() => clientPlayer.atoms.game.joinLobby)
+	const [matchConfig, setMatchConfig] = useAtom(() => lobbyContext.atoms.matchConfig)
+	const p2pSession = useAtomValue(() => gameSession.active)
 	const startCurrentGame = useAtomSet(() => clientPlayer.atoms.game.start)
-	const [playerName, setPlayerName] = useAtom(() => clientPlayer.atoms.player.name)
-	const playerId = useAtomValue(() => clientPlayer.atoms.player.id)
-	const isInLobby = () => props.players.some((player) => player.id === playerId())
+	const players = useAtomValue(() => lobbyContext.atoms.allPlayers)
+	const userPeer = useAtomValue(() => lobbyContext.atoms.user)
+	const [playerName, setPlayerName] = useAtom(() => clientPlayer.atoms.playerName)
+	const mutateRouter = useAtomSet(() => router.mutate)
+	const playerId = () => userPeer().id
 	const peers = useAtomValue(() => gameSession.peers)
+	const rawPeers = useAtomValue(() => gameSession.peers)
+	if (Option.isNone(p2pSession())) {
+		console.error("No active game session found. Redirecting to home.")
+		mutateRouter({
+			mutation: (url) => {
+				url.pathname = "/"
+				url.searchParams.delete("id")
+			},
+			pushHistory: false
+		})
+		return (
+			<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-red-500">
+				Error: No active game session found.
+			</p>
+		)
+	}
 	return (
 		<form
 			class="flex w-full flex-col items-center gap-5"
 			onSubmit={(event: SubmitEvent) => {
 				event.preventDefault()
-				const trimmedName = playerName().trim()
-				if (trimmedName.length === 0) {
-					setPlayerName(`Player-${Math.floor(Math.random() * 1000)}`)
-				}
-				joinLobby()
 			}}
 		>
+			<p>{console.log(rawPeers()) ?? JSON.stringify(rawPeers(), null, 2)}</p>
 			<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-label">
 				Waiting for players to join...
 			</p>
@@ -54,8 +65,8 @@ const Lobby: Component<LobbyProps> = (props) => {
 									name="matchRounds"
 									class="hidden"
 									value={rounds}
-									checked={props.config.numRounds === rounds}
-									onChange={() => setMatchConfig(rounds === 3 ? "Three" : rounds === 5 ? "Five" : "Seven")}
+									checked={matchConfig().numRounds === rounds}
+									onChange={() => setMatchConfig({ numRounds: rounds })}
 								/>
 								<span class="text-xs font-bold uppercase tracking-[0.2em] text-label-soft transition-colors group-has-[:checked]:text-tile-gem-text">
 									{rounds} Rounds
@@ -68,12 +79,12 @@ const Lobby: Component<LobbyProps> = (props) => {
 			<div class="w-full rounded-xl border border-shell bg-paper-50 px-3 py-2 text-left text-xs font-semibold tracking-[0.12em] text-ink">
 				<div class="flex items-center justify-between gap-3 uppercase tracking-[0.2em] text-label-soft">
 					<span>Players</span>
-					<span>{props.players.length}</span>
+					<span>{players().length}</span>
 				</div>
 				<div class="mt-3 space-y-2">
-					{props.players.length > 0
+					{players().length > 0
 						? (
-							<For each={props.players}>
+							<For each={players()}>
 								{(player) => (
 									<div class="flex items-center justify-between gap-4 rounded-lg bg-paper-100 px-3 py-2">
 										<div class="flex items-center gap-2">
@@ -127,19 +138,19 @@ const Lobby: Component<LobbyProps> = (props) => {
 					class="inline-flex w-full items-center justify-center rounded-full border border-control-border bg-gradient-to-b from-control-from to-control-to px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-control-text shadow-button transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-36 whitespace-nowrap"
 					disabled={playerName().trim().length === 0}
 				>
-					{!isInLobby() ? "Join lobby" : "Update name"}
+					{"Update name"}
 				</button>
 			</div>
 			<div class="flex w-full flex-col items-stretch gap-2">
 				<button
 					type="button"
 					onClick={() => {
-						if (props.players.length < MIN_PLAYERS) {
+						if (players().length < MIN_PLAYERS) {
 							return
 						}
 						startCurrentGame()
 					}}
-					disabled={props.players.length < MIN_PLAYERS}
+					disabled={players().length < MIN_PLAYERS}
 					class="inline-flex w-full items-center justify-center rounded-full border border-control-border bg-gradient-to-b from-control-from to-control-to px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-control-text shadow-button transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:brightness-100 sm:w-auto sm:min-w-36"
 				>
 					Start game

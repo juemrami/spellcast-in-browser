@@ -3,7 +3,7 @@ import { Context, Data, Effect, HashMap, pipe, Predicate, Queue, Ref, Stream } f
 import type { JsonValue } from "effect/testing/FastCheck"
 import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
-import { joinRoom, type Room } from "trystero"
+import { joinRoom, type Room, selfId } from "trystero"
 
 export type PeerEvent = Data.TaggedEnum<{
 	Join: { readonly peerId: string }
@@ -37,7 +37,7 @@ const makePeerEventStream = (room: Room) =>
 	})
 // const makeRoomAction = <R extends DataPayload>(room: Room, action: string) => room.makeAction<R>(action)
 
-type Peer = {
+export type TrysteroPeer = {
 	id: string // peerId
 	connection: RTCPeerConnection // from getPeers()[id]
 	streams: HashMap.HashMap<string, { // keyed by stream.id or metadata
@@ -66,12 +66,12 @@ export class TrysteroRoom extends Context.Service<TrysteroRoom>()(
 				try: () => joinRoom(...options.args),
 				catch: (error) => {
 					console.error("Failed to join room", { cause: error })
-					return Effect.fail(new TrysteroJoinRoomError({ message: "Failed to join room", cause: error }))
+					return new TrysteroJoinRoomError({ message: "Failed to join room", cause: error })
 				}
 			})
 			yield* Effect.log("Joined room with ID: " + options.args[1])
 			const peerEvents = yield* makePeerEventStream(room)
-			const peersRef = yield* Ref.make(new Map<string, Peer>())
+			const peersRef = yield* Ref.make(new Map<string, TrysteroPeer>())
 			const peersAtom = Atom.make(() => Ref.getUnsafe(peersRef))
 			yield* Effect.forkScoped(pipe(
 				peerEvents,
@@ -85,7 +85,7 @@ export class TrysteroRoom extends Context.Service<TrysteroRoom>()(
 									streams: HashMap.empty(),
 									tracks: HashMap.empty()
 								})),
-							Effect.andThen(() => Effect.log(`Peer joined: ${peerId}`))
+							Effect.andThen(() => Effect.log(`Peer joined: ${peerId}, isSelf: ${peerId === selfId}`))
 						),
 
 					Leave: ({ peerId }) =>
