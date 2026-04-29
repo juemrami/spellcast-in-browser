@@ -2,14 +2,14 @@ import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { Match, Option } from "effect"
 import { router } from "../../../App"
 import { GameMatchState } from "../../../services/GameStateMachine"
-import { gameSession, gameStateMachine } from "../../../services/layers"
-import GameBoard from "./GameBoard"
+import { gameStateMachine, p2pSession } from "../../../services/layers"
 import Lobby from "../Lobby"
+import GameBoard from "./GameBoard"
 import RoundSummary from "./RoundSummary"
 
 export default function GameMatch() {
 	const currentGame = useAtomValue(() => gameStateMachine.atoms.state)
-	const activeSession = useAtomValue(() => gameSession.active)
+	const activeSession = useAtomValue(() => p2pSession.active)
 	const setRouterPath = useAtomSet(() => router.pathname)
 	return (
 		<section class="w-full max-w-[31.5rem] rounded-[2rem] border border-shell bg-gradient-to-b from-paper-50 to-paper-100 p-2 shadow-panel-hero sm:p-4">

@@ -72,7 +72,7 @@ export class TrysteroRoom extends Context.Service<TrysteroRoom>()(
 			yield* Effect.log("Joined room with ID: " + options.args[1])
 			const peerEvents = yield* makePeerEventStream(room)
 			const peersRef = yield* Ref.make(new Map<string, TrysteroPeer>())
-			const peersAtom = Atom.make(() => Ref.getUnsafe(peersRef))
+			const peersAtom = Atom.make(() => new Map(Ref.getUnsafe(peersRef)))
 			yield* Effect.forkScoped(pipe(
 				peerEvents,
 				Stream.tap(PeerEvent.$match({

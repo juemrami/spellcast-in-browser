@@ -5,21 +5,20 @@ import { For } from "solid-js"
 import { Option, pipe } from "effect"
 import { router } from "../../App"
 import { MIN_PLAYERS } from "../../services/GameStateMachine"
-import { clientPlayer, gameSession, lobbyContext } from "../../services/layers"
+import { clientPlayer, lobbyContext, p2pSession } from "../../services/layers"
 
 const Lobby: Component = () => {
 	// const joinLobby = useAtomSet(() => clientPlayer.atoms.game.joinLobby)
 	const [matchConfig, setMatchConfig] = useAtom(() => lobbyContext.atoms.matchConfig)
-	const p2pSession = useAtomValue(() => gameSession.active)
+	const p2p = useAtomValue(() => p2pSession.atoms.active)
 	const startCurrentGame = useAtomSet(() => clientPlayer.atoms.game.start)
 	const players = useAtomValue(() => lobbyContext.atoms.allPlayers)
 	const userPeer = useAtomValue(() => lobbyContext.atoms.user)
 	const [playerName, setPlayerName] = useAtom(() => clientPlayer.atoms.playerName)
 	const mutateRouter = useAtomSet(() => router.mutate)
 	const playerId = () => userPeer().id
-	const peers = useAtomValue(() => gameSession.peers)
-	const rawPeers = useAtomValue(() => gameSession.peers)
-	if (Option.isNone(p2pSession())) {
+	const peers = useAtomValue(() => p2pSession.atoms.peers)
+	if (Option.isNone(p2p())) {
 		console.error("No active game session found. Redirecting to home.")
 		mutateRouter({
 			mutation: (url) => {
@@ -41,7 +40,6 @@ const Lobby: Component = () => {
 				event.preventDefault()
 			}}
 		>
-			<p>{console.log(rawPeers()) ?? JSON.stringify(rawPeers(), null, 2)}</p>
 			<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-label">
 				Waiting for players to join...
 			</p>

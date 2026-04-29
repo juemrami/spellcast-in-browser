@@ -55,7 +55,7 @@ export const make = Effect.gen(function*() {
 	// }
 	const makeDefaultPeerState = (peerId: string, name?: string): LobbyPeerState => ({
 		id: peerId,
-		name: `Player-${p2pSession.userPeerId.slice(0, 6)}`,
+		name: `Player-${peerId.slice(0, 6)}`,
 		ready: true,
 		joinedAt: Date.now()
 	})
@@ -88,7 +88,7 @@ export const make = Effect.gen(function*() {
 
 	// Atom-based reactivity for UI
 	const lobbyPeerStates = Atom.make((get) => {
-		const trysteroPeers = get(p2pSession.peers).pipe(Option.getOrUndefined)
+		const trysteroPeers = get(p2pSession.atoms.peers).pipe(Option.getOrUndefined)
 		if (trysteroPeers === undefined) {
 			return new Map<string, LobbyPeerState>()
 		}

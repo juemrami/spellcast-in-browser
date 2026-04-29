@@ -5,13 +5,13 @@ import type { Component } from "solid-js"
 import { createSignal } from "solid-js"
 import { router } from "../../App"
 import { GameMatchState, GameState } from "../../services/GameStateMachine"
-import { gameSession, gameStateMachine } from "../../services/layers"
+import { gameStateMachine, p2pSession } from "../../services/layers"
 
 const HomeScreen: Component = () => {
 	const mutateRouter = useAtomSet(() => router.mutate)
 	const currentGame = useAtomValue(() => gameStateMachine.atoms.state)
-	const activeSession = useAtomValue(() => gameSession.active)
-	const joinSession = useAtomSet(() => gameSession.join)
+	const activeSession = useAtomValue(() => p2pSession.atoms.active)
+	const joinSession = useAtomSet(() => p2pSession.atoms.join)
 	const matchInfo = () => {
 		if (Option.isNone(activeSession())) return undefined
 		const state = currentGame()
