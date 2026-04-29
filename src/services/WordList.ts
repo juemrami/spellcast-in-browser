@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Random } from "effect"
 import { toLowerCase } from "effect/String"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
-import wordnikWordListUrl from "../wordlists/wordnik.txt?url"
+import wordnikWordListUrl from "../wordlists/wordnik.test.txt?url"
 
 const ENGLISH_ALPHABET = [
 	"A",
