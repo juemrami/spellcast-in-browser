@@ -16,10 +16,10 @@ const makeDefaultPlayerName = (): string => {
 	return `Player-${Math.floor(Math.random() * 1000)}`
 }
 
-const PlayerIdentity = Schema.Struct({
-	id: Schema.String.pipe(Schema.check(Schema.isUUID(4))),
-	name: Schema.String
-}).pipe(Schema.fromJsonString)
+// const PlayerIdentity = Schema.Struct({
+// 	id: Schema.String.pipe(Schema.check(Schema.isUUID(4))),
+// 	name: Schema.String
+// }).pipe(Schema.fromJsonString)
 
 const localStorageAtomRuntime = Atom.runtime(layerLocalStorage)
 /** Reactive browser runtime saved user variables */

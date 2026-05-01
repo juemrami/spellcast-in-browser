@@ -77,6 +77,8 @@ When you do this make sure the mark the current for change for deletion/cleanup 
     - Validate the hypothesis with tests, logs, or user repro feedback.
     - If the hypothesis fails, explicitly update beliefs, form a new hypothesis, and iterate.
     - Keep each hypothesis-test-change cycle atomic and scoped.
+    - !important Trace the full call path before forming a hypothesis. Reading only the symptom site (where the behavior differs) is not enough — read every layer between the call site and where the effect is actually executed.
+     - A plausible story built on partial context is worse than no hypothesis because it wastes the user's time.
 
 ---
 

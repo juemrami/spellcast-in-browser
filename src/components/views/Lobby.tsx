@@ -1,24 +1,23 @@
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-solid"
+import { Effect } from "effect"
 import type { Component } from "solid-js"
 import { For } from "solid-js"
-
-import { Option, pipe } from "effect"
 import { router } from "../../App"
 import { MIN_PLAYERS } from "../../services/GameStateMachine"
-import { clientPlayer, lobbyContext, p2pSession } from "../../services/layers"
+import { clientPlayer, lobbyContext } from "../../services/layers"
 
 const Lobby: Component = () => {
 	// const joinLobby = useAtomSet(() => clientPlayer.atoms.game.joinLobby)
 	const [matchConfig, setMatchConfig] = useAtom(() => lobbyContext.atoms.matchConfig)
-	const p2p = useAtomValue(() => p2pSession.atoms.active)
+	const p2pRoom = useAtomValue(() => lobbyContext.atoms.room)
 	const startCurrentGame = useAtomSet(() => clientPlayer.atoms.game.start)
 	const players = useAtomValue(() => lobbyContext.atoms.allPlayers)
 	const userPeer = useAtomValue(() => lobbyContext.atoms.user)
 	const [playerName, setPlayerName] = useAtom(() => clientPlayer.atoms.playerName)
 	const mutateRouter = useAtomSet(() => router.mutate)
-	const playerId = () => userPeer().id
-	const peers = useAtomValue(() => p2pSession.atoms.peers)
-	if (Option.isNone(p2p())) {
+	const userId = () => userPeer().id
+	const isUserReady = () => userPeer().ready
+	if (!p2pRoom()) {
 		console.error("No active game session found. Redirecting to home.")
 		mutateRouter({
 			mutation: (url) => {
@@ -33,7 +32,7 @@ const Lobby: Component = () => {
 			</p>
 		)
 	}
-	return (
+	else return (
 		<form
 			class="flex w-full flex-col items-center gap-5"
 			onSubmit={(event: SubmitEvent) => {
@@ -43,13 +42,6 @@ const Lobby: Component = () => {
 			<p class="text-center text-sm font-semibold uppercase tracking-[0.28em] text-label">
 				Waiting for players to join...
 			</p>
-			<div>
-				{pipe(
-					peers(),
-					Option.map((p) => Array.from(p.values()).map((p) => p.id)),
-					Option.getOrUndefined
-				)}
-			</div>
 			<div class="flex w-full flex-col gap-2 text-left">
 				<span class="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-label-soft">
 					Match format
@@ -85,11 +77,22 @@ const Lobby: Component = () => {
 							<For each={players()}>
 								{(player) => (
 									<div class="flex items-center justify-between gap-4 rounded-lg bg-paper-100 px-3 py-2">
-										<div class="flex items-center gap-2">
+										<div class="flex items-center gap-2" title={player.id}>
+											<span
+												aria-label={player.ready ? "Ready" : "Not ready"}
+												title={player.ready ? "Ready" : "Not ready"}
+												class={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[0.68rem] font-black leading-none ${
+													player.ready
+														? "border-emerald-500/20 bg-emerald-500/15 text-emerald-600"
+														: "border-red-500/20 bg-red-500/15 text-red-500"
+												}`}
+											>
+												{player.ready ? "\u2713" : "\u2715"}
+											</span>
 											<span class="font-semibold tracking-[0.1em] text-header">
 												{player.name}
 											</span>
-											{playerId() === player.id
+											{userId() === player.id
 												? (
 													<span class="text-[0.72rem] font-medium tracking-[0.08em] text-label-muted">
 														(you)
@@ -132,11 +135,31 @@ const Lobby: Component = () => {
 					/>
 				</label>
 				<button
-					type="submit"
-					class="inline-flex w-full items-center justify-center rounded-full border border-control-border bg-gradient-to-b from-control-from to-control-to px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-control-text shadow-button transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-36 whitespace-nowrap"
-					disabled={playerName().trim().length === 0}
+					type="button"
+					aria-pressed={isUserReady()}
+					onClick={async() => {
+						p2pRoom()?.actions.ReadyStatus.send(!isUserReady()).pipe(
+							Effect.runPromise
+						)
+					}
+				}
+					class={`inline-flex w-full items-center justify-center gap-2 rounded-full border px-5 py-3 text-[0.72rem] font-semibold uppercase tracking-[0.28em] shadow-button transition sm:w-auto sm:min-w-36 whitespace-nowrap ${
+						isUserReady()
+							? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700"
+							: "border-red-500/25 bg-red-500/10 text-red-600"
+					}`}
 				>
-					{"Update name"}
+					<span
+						aria-hidden="true"
+						class={`inline-flex h-4 w-4 shrink-0 items-center justify-center text-tightest text-center rounded-[0.22rem] border text-[0.62rem] leading-none ${
+							isUserReady()
+								? "border-emerald-600/30 bg-emerald-600 text-white"
+								: "border-red-500/30 bg-white/80 text-red-600"
+						}`}
+					>
+						{isUserReady() ? "\u2713" : ""}
+					</span>
+					{isUserReady() ? "Ready" : "Not Ready"}
 				</button>
 			</div>
 			<div class="flex w-full flex-col items-stretch gap-2">
