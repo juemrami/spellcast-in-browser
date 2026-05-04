@@ -15,7 +15,7 @@ const Lobby: Component = () => {
 	const userPeer = useAtomValue(() => lobbyContext.atoms.user)
 	const [playerName, setPlayerName] = useAtom(() => clientPlayer.atoms.playerName)
 	const mutateRouter = useAtomSet(() => router.mutate)
-	const userId = () => userPeer().id
+	const userPeerId = () => userPeer().peerId
 	const isUserReady = () => userPeer().ready
 	if (!p2pRoom()) {
 		console.error("No active game session found. Redirecting to home.")
@@ -77,7 +77,7 @@ const Lobby: Component = () => {
 							<For each={players()}>
 								{(player) => (
 									<div class="flex items-center justify-between gap-4 rounded-lg bg-paper-100 px-3 py-2">
-										<div class="flex items-center gap-2" title={player.id}>
+										<div class="flex items-center gap-2" title={player.peerId}>
 											<span
 												aria-label={player.ready ? "Ready" : "Not ready"}
 												title={player.ready ? "Ready" : "Not ready"}
@@ -92,7 +92,7 @@ const Lobby: Component = () => {
 											<span class="font-semibold tracking-[0.1em] text-header">
 												{player.name}
 											</span>
-											{userId() === player.id
+											{userPeerId() === player.peerId
 												? (
 													<span class="text-[0.72rem] font-medium tracking-[0.08em] text-label-muted">
 														(you)
@@ -112,7 +112,7 @@ const Lobby: Component = () => {
 								)}
 							</For>
 						)
-						: (
+						: ( 
 							<p class="rounded-lg bg-paper-100 px-3 py-2 text-[0.72rem] font-medium tracking-[0.08em] text-label-muted">
 								No players yet.
 							</p>

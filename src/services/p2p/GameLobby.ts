@@ -32,11 +32,7 @@ const makeTrysteroRoomActions = <const TActions extends ActionConfig>(actions: T
 				send: (data, targetPeerIds) =>
 					pipe(
 						Effect.promise(() => send(data, targetPeerIds)),
-						Effect.andThen(() =>
-							(action.onSend?.(data, targetPeerIds) ?? Effect.void).pipe(
-								Effect.andThen(() => Effect.log("post send callback"))
-							)
-						)
+						Effect.andThen(() => (action.onSend?.(data, targetPeerIds) ?? Effect.void))
 					)
 			}
 			// todo: use a Queue or Stream instead
@@ -59,7 +55,8 @@ export interface MatchSnapshot {
  * Ephemeral coordination data, not part of the frozen match.
  */
 export interface LobbyPeerState {
-	readonly id: string
+	readonly peerId: string
+	readonly playerUUID: string
 	readonly name: string
 	readonly ready: boolean
 	readonly joinedAt: number
@@ -88,8 +85,9 @@ export const make = Effect.gen(function*() {
 	// if (pipe(yield* Atom.get(p2pSession.active), Option.isNone)) {
 	// 	return yield* new MissingP2PSession({ message: "Cannot initialize lobby: no active P2P session" })
 	// }
-	const makeDefaultPeerState = (peerId: string): LobbyPeerState => ({
-		id: peerId,
+	const makeDefaultPeerState = (playerId: string, peerId: string): LobbyPeerState => ({
+		peerId: peerId,
+		playerUUID: playerId,
 		name: `Player-${peerId.slice(0, 6)}`,
 		ready: true,
 		joinedAt: Date.now()
@@ -124,15 +122,18 @@ export const make = Effect.gen(function*() {
 	// Local player metadata (mutable while in lobby)
 	const userPeerState = Atom.writable((get) => {
 		const name = get(user.atoms.playerName)
+		const playerUUID = get(user.atoms.playerUUID)
+		const playerPeerId = p2pSession.userPeerId
 		const existing = pipe(
 			get.self<LobbyPeerState>(),
-			Option.getOrElse<LobbyPeerState>(() => makeDefaultPeerState(p2pSession.userPeerId))
+			Option.getOrElse<LobbyPeerState>(() => makeDefaultPeerState(playerUUID, playerPeerId))
 		)
-		if (name !== existing.name || existing.id !== p2pSession.userPeerId) {
+		if (name !== existing.name || existing.playerUUID !== playerUUID) {
 			return {
 				...existing,
 				name,
-				id: p2pSession.userPeerId
+				peerId: playerPeerId,
+				playerUUID
 			}
 		} else {
 			return existing
@@ -160,14 +161,13 @@ export const make = Effect.gen(function*() {
 			Option.map((existing) => {
 				// Build a new map based on Trystero peers, preserving existing metadata
 				const existingMap = existing
-				const peerIds: Array<string> = Array.from(trysteroPeers.keys())
 				const updated = new Map<string, LobbyPeerState>()
-				for (const id of peerIds) {
-					const prev = existingMap.get(id)
+				for (const [peerId, peer] of trysteroPeers.entries()) {
+					const prev = existingMap.get(peerId)
 					if (prev) {
-						updated.set(id, prev)
+						updated.set(peerId, prev)
 					} else {
-						updated.set(id, makeDefaultPeerState(id))
+						updated.set(peerId, makeDefaultPeerState(peer.playerUUID, peerId))
 					}
 				}
 				return updated
@@ -220,10 +220,10 @@ export const make = Effect.gen(function*() {
 			...readyPeers
 		]
 
-		// Derive deterministic turn order by sorting player IDs
+		// Derive deterministic turn order by sorting player UUIDs
 		// This ensures all peers independently derive the same order
 		const turnOrder = allPlayers
-			.map((p) => p.id)
+			.map((p) => p.playerUUID)
 			.sort() // deterministic order
 
 		// Generate seed for board generation
@@ -231,10 +231,10 @@ export const make = Effect.gen(function*() {
 
 		// Build immutable snapshot
 		const snapshot: MatchSnapshot = {
-			matchId: `match-${Date.now()}-${local.id.slice(0, 6)}`,
+			matchId: `match-${Date.now()}-${local.playerUUID.slice(0, 6)}`,
 			createdAt: Date.now(),
 			players: allPlayers.map((p) => ({
-				id: p.id,
+				id: p.playerUUID,
 				name: p.name
 			})),
 			config,

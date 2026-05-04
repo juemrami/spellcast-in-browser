@@ -1,8 +1,17 @@
 // oxlint-disable no-console
+import { RegistryContext } from "@effect/atom-solid/RegistryContext"
 import { Context, Data, Effect, Exit, Layer, Option, pipe, Ref, Scope } from "effect"
-import { Atom } from "effect/unstable/reactivity"
+import { Atom, AtomRegistry } from "effect/unstable/reactivity"
+import { useContext } from "solid-js"
 import { selfId } from "trystero"
+import { SavedUserConfig } from "./ClientPlayer"
 import { TrysteroRoom } from "./Trystero"
+
+const withSolidContextRegistry = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+	pipe(
+		effect,
+		Effect.provideService(AtomRegistry.AtomRegistry, useContext(RegistryContext))
+	)
 
 type ActiveConnection = {
 	/** The backing TrysteroRoom service */
@@ -24,7 +33,10 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 	"SessionManager",
 	{
 		make: Effect.gen(function*() {
+			const user = yield* SavedUserConfig
 			const activeRef = yield* Ref.make(Option.none<ActiveConnection>())
+			const peerToUUIDMapRef = yield* Ref.make(new Map<string, string>())
+			const peerIdentitiesAtom = Atom.make(() => new Map(Ref.getUnsafe(peerToUUIDMapRef)))
 			const makeTrysteroRoomConnection = Effect.fn(function*(lobbyId: string, failOnExisting?: boolean) {
 				const current = pipe(yield* Ref.get(activeRef), Option.getOrUndefined)
 				if (current) {
@@ -42,8 +54,29 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 						{ appId: "bogglecast-v0" },
 						lobbyId,
 						{
-							onPeerHandshake: async (id, _, __, isInitiator) => {
-								console.log("Peer handshake", { id, isInitiator })
+							onPeerHandshake: async (peerId, send, receive, isInitiator) => {
+								let peerPlayerUUID: string
+								const clientUserUUID = Effect.runSync(
+									Atom.get(user.atoms.identity.uuid).pipe(
+										withSolidContextRegistry
+									)
+								)
+								if (isInitiator) {
+									await send({ playerUUID: clientUserUUID })
+									const { data } = await receive()
+									peerPlayerUUID = (data as { playerUUID: string }).playerUUID
+								} else {
+									const { data } = await receive()
+									peerPlayerUUID = (data as { playerUUID: string }).playerUUID
+									await send({ playerUUID: clientUserUUID })
+								}
+								Effect.runSync(
+									pipe(
+										Ref.update(peerToUUIDMapRef, (map) => map.set(peerId, peerPlayerUUID)),
+										Effect.andThen(() => Atom.refresh(peerIdentitiesAtom)),
+										withSolidContextRegistry
+									)
+								)
 							},
 							onJoinError: (err) => {
 								console.error("Failed to join room", err)
@@ -80,7 +113,18 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 			}))
 			const peersAtom = Atom.make((get) => {
 				const session = get(activeAtom)
-				return Option.map(session, (s) => get(s.room.atoms.peers))
+				const identities = get(peerIdentitiesAtom)
+				return Option.map(session, (s) => {
+					const peers = get(s.room.atoms.peers)
+					return new Map(
+						Array.from(peers.entries()).map(([peerId, peer]) => [
+							peerId,
+							// Safe: onPeerJoin only fires after onPeerHandshake resolves (Trystero guarantee),
+							// so peerIdentitiesAtom is always populated before this peer appears in room.atoms.peers
+							{ ...peer, playerUUID: identities.get(peerId)! }
+						])
+					)
+				})
 			})
 			return {
 				userPeerId: selfId,
@@ -94,5 +138,5 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 		})
 	}
 ) {
-	static layer = Layer.effect(this, this.make)
+	static layer = Layer.effect(this, this.make.pipe(withSolidContextRegistry))
 }

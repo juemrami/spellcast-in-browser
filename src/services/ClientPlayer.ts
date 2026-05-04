@@ -1,10 +1,12 @@
 import { layerLocalStorage } from "@effect/platform-browser/BrowserKeyValueStore"
-import { Effect, Layer, pipe, Schema } from "effect"
+import { Effect, Layer, pipe, Random, Schema } from "effect"
 import * as Context from "effect/Context"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import type { Tile } from "../types/game"
 import { CurrentBoard } from "./CurrentBoard"
 import { GameMatchAction, GameState, GameStateMachine, isActiveTurnState } from "./GameStateMachine"
+
+const toReadableAtom = <T>(atom: Atom.Writable<T>) => Atom.readable((get) => get(atom))
 
 const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	const rowDiff = Math.abs(tileA.row - tileB.row)
@@ -12,14 +14,10 @@ const areTilesAdjacent = (tileA: Tile, tileB: Tile): boolean => {
 	return rowDiff <= 1 && colDiff <= 1
 }
 
+const makeUUID = (): string => Effect.runSync(Random.nextUUIDv4)
 const makeDefaultPlayerName = (): string => {
 	return `Player-${Math.floor(Math.random() * 1000)}`
 }
-
-// const PlayerIdentity = Schema.Struct({
-// 	id: Schema.String.pipe(Schema.check(Schema.isUUID(4))),
-// 	name: Schema.String
-// }).pipe(Schema.fromJsonString)
 
 const localStorageAtomRuntime = Atom.runtime(layerLocalStorage)
 /** Reactive browser runtime saved user variables */
@@ -27,6 +25,18 @@ export class SavedUserConfig extends Context.Service<SavedUserConfig>()(
 	"app/UserConfig",
 	{
 		make: Effect.gen(function*() {
+			const playerId = Atom.kvs({
+				key: "user:playerId",
+				schema: Schema.String,
+				runtime: localStorageAtomRuntime,
+				defaultValue: makeUUID
+			})
+			const playerSecret = Atom.kvs({
+				key: "user:playerSecret",
+				schema: Schema.String,
+				runtime: localStorageAtomRuntime,
+				defaultValue: makeUUID
+			})
 			const name = Atom.kvs({
 				key: "user:name",
 				schema: Schema.String,
@@ -36,7 +46,11 @@ export class SavedUserConfig extends Context.Service<SavedUserConfig>()(
 
 			return {
 				atoms: {
-					name: name
+					identity: {
+						uuid: playerId,
+						secret: playerSecret,
+						name: name
+					}
 				}
 			}
 		})
@@ -90,7 +104,6 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 			window.addEventListener("mouseup", () => get.setSelf(false))
 			return false
 		})
-		const playerName = user.atoms.name
 
 		const setMatchConfig = Atom.fn(Effect.fn(function*(numRounds: "Three" | "Five" | "Seven", get: Atom.FnContext) {
 			return yield* useAction(get, GameMatchAction.setMatchConfig({ numRounds }))
@@ -115,6 +128,8 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 				})
 			)
 		}))
+		const playerName = user.atoms.identity.name
+		const playerUUID = user.atoms.identity.uuid
 		const submitSelectionPath = Atom.fn(Effect.fn(function*(_: void, get: Atom.FnContext) {
 			const path = get(selectionPath)
 			if (path.length === 0) return false
@@ -125,7 +140,7 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 						? Effect.die(new Error("Cannot submit word when game is crashed", { cause: game.cause }))
 						: useAction(
 							get,
-							GameMatchAction.submitWord({ path, playerId: get(user.atoms.name) })
+							GameMatchAction.submitWord({ path, playerId: get(playerUUID) })
 						),
 				Effect.tapError(Effect.logError),
 				Effect.catchTags({
@@ -153,11 +168,13 @@ export class ClientPlayerState extends Context.Service<ClientPlayerState>()("app
 		const isPlayerTurn = Atom.make((get) => {
 			const game = get(gameState)
 			if (!isActiveTurnState(game)) return false
-			return game.snapshot.currentRound.currentTurn.playerId === get(user.atoms.name)
+			return game.snapshot.currentRound.currentTurn.playerId === get(playerUUID)
 		})
 		return {
 			atoms: {
 				playerName,
+				playerUUID: toReadableAtom(user.atoms.identity.uuid),
+				playerSecret: toReadableAtom(user.atoms.identity.secret),
 				autoSubmit: Atom.writable(
 					(get) => {
 						get.mount(autoSubmitEffect)
