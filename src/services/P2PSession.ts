@@ -13,6 +13,26 @@ const withSolidContextRegistry = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 		Effect.provideService(AtomRegistry.AtomRegistry, useContext(RegistryContext))
 	)
 
+/** Exchanges app level user UUIDs when performing a peer handshake */
+export const onPeerHandshakeShareUUID = async (
+	clientUserUUID: string,
+	send: (data: { playerUUID: string }) => Promise<void>,
+	receive: () => Promise<{ data: { playerUUID: string } }>,
+	isInitiator: boolean
+) => {
+	let peerPlayerUUID: string
+	if (isInitiator) {
+		await send({ playerUUID: clientUserUUID })
+		const { data } = await receive()
+		peerPlayerUUID = data.playerUUID
+	} else {
+		const { data } = await receive()
+		peerPlayerUUID = data.playerUUID
+		await send({ playerUUID: clientUserUUID })
+	}
+	return peerPlayerUUID
+}
+
 type ActiveConnection = {
 	/** The backing TrysteroRoom service */
 	readonly room: typeof TrysteroRoom.Service
@@ -34,6 +54,7 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 	{
 		make: Effect.gen(function*() {
 			const user = yield* SavedUserConfig
+			const userUUID = yield* Atom.get(user.atoms.identity.uuid).pipe(withSolidContextRegistry)
 			const activeRef = yield* Ref.make(Option.none<ActiveConnection>())
 			const peerToUUIDMapRef = yield* Ref.make(new Map<string, string>())
 			const peerIdentitiesAtom = Atom.make(() => new Map(Ref.getUnsafe(peerToUUIDMapRef)))
@@ -55,21 +76,12 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 						lobbyId,
 						{
 							onPeerHandshake: async (peerId, send, receive, isInitiator) => {
-								let peerPlayerUUID: string
-								const clientUserUUID = Effect.runSync(
-									Atom.get(user.atoms.identity.uuid).pipe(
-										withSolidContextRegistry
-									)
+								const peerPlayerUUID = await onPeerHandshakeShareUUID(
+									userUUID,
+									send,
+									receive as () => Promise<{ data: { playerUUID: string } }>,
+									isInitiator
 								)
-								if (isInitiator) {
-									await send({ playerUUID: clientUserUUID })
-									const { data } = await receive()
-									peerPlayerUUID = (data as { playerUUID: string }).playerUUID
-								} else {
-									const { data } = await receive()
-									peerPlayerUUID = (data as { playerUUID: string }).playerUUID
-									await send({ playerUUID: clientUserUUID })
-								}
 								Effect.runSync(
 									pipe(
 										Ref.update(peerToUUIDMapRef, (map) => map.set(peerId, peerPlayerUUID)),
