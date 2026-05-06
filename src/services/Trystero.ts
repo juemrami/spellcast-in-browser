@@ -3,7 +3,7 @@ import { Context, Data, Effect, HashMap, pipe, Predicate, Queue, Ref, Stream } f
 import type { JsonValue } from "effect/testing/FastCheck"
 import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
-import { joinRoom, type Room, selfId } from "trystero"
+import { type DataPayload, joinRoom, type Room, selfId } from "trystero"
 
 export type PeerEvent = Data.TaggedEnum<{
 	Join: { readonly peerId: string }
@@ -35,7 +35,22 @@ const makePeerEventStream = (room: Room) =>
 		)
 		return Stream.fromQueue(queue)
 	})
+
+export class PeerHandshakeSendError extends Data.TaggedError("PeerHandshakeSendError")<{
+	readonly message: string
+	readonly cause: unknown
+}> {}
+export class PeerHandshakeReceiveError extends Data.TaggedError("PeerHandshakeReceiveError")<{
+	readonly message: string
+	readonly cause: unknown
+}> {}
 // const makeRoomAction = <R extends DataPayload>(room: Room, action: string) => room.makeAction<R>(action)
+export type PeerHandshakeArgs<T extends DataPayload> = {
+	readonly peerId: string
+	readonly isInitiator: boolean
+	readonly send: (data: T) => Effect.Effect<void, PeerHandshakeSendError>
+	readonly receive: Effect.Effect<T, PeerHandshakeReceiveError>
+}
 
 export type TrysteroPeer = {
 	id: string // peerId
@@ -58,10 +73,46 @@ class TrysteroJoinRoomError extends Data.TaggedError("TrysteroJoinRoomError")<{
 export class TrysteroRoom extends Context.Service<TrysteroRoom>()(
 	"TrysteroRoom",
 	{
-		make: Effect.fn(function*(options: {
-			args: Parameters<typeof joinRoom>
-			actions: {}
-		}) {
+		make: Effect.fn(function*<
+			HandshakeData extends DataPayload = DataPayload,
+			HandshakeError = never
+		>(
+			options: {
+				args: Parameters<typeof joinRoom>
+				handshake?: (conn: PeerHandshakeArgs<HandshakeData>) => Effect.Effect<any, HandshakeError>
+				actions: {}
+			}
+		) {
+			const callbacks = options.args[2] ?? {}
+			const handshake = options.handshake
+			if (handshake) {
+				callbacks.onPeerHandshake = async (peerId, send, receive, isInitiator) => {
+					await Effect.runPromise(
+						handshake({
+							isInitiator,
+							peerId,
+							send: (data) =>
+								Effect.tryPromise({
+									try: () => send(data),
+									catch: (error) =>
+										new PeerHandshakeSendError({
+											message: "Failed sending handshake data to peer=" + peerId,
+											cause: error
+										})
+								}),
+							receive: Effect.tryPromise({
+								try: () => receive().then((res) => res.data as HandshakeData),
+								catch: (error) =>
+									new PeerHandshakeReceiveError({
+										message: "Failed receiving handshake data from peer=" + peerId,
+										cause: error
+									})
+							})
+						})
+					)
+				}
+			}
+			options.args[2] = callbacks
 			const room = yield* Effect.try({
 				try: () => joinRoom(...options.args),
 				catch: (error) => {

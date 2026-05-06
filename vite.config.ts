@@ -7,6 +7,7 @@ export default defineConfig({
 	server: {
 		watch: {
 			ignored: [
+				"**/.jj/**",
 				"**/wordlists/**"
 			]
 		},

@@ -5,33 +5,13 @@ import { Atom, AtomRegistry } from "effect/unstable/reactivity"
 import { useContext } from "solid-js"
 import { selfId } from "trystero"
 import { SavedUserConfig } from "./ClientPlayer"
-import { TrysteroRoom } from "./Trystero"
+import { type PeerHandshakeArgs, TrysteroRoom } from "./Trystero"
 
 const withSolidContextRegistry = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 	pipe(
 		effect,
 		Effect.provideService(AtomRegistry.AtomRegistry, useContext(RegistryContext))
 	)
-
-/** Exchanges app level user UUIDs when performing a peer handshake */
-export const onPeerHandshakeShareUUID = async (
-	clientUserUUID: string,
-	send: (data: { playerUUID: string }) => Promise<void>,
-	receive: () => Promise<{ data: { playerUUID: string } }>,
-	isInitiator: boolean
-) => {
-	let peerPlayerUUID: string
-	if (isInitiator) {
-		await send({ playerUUID: clientUserUUID })
-		const { data } = await receive()
-		peerPlayerUUID = data.playerUUID
-	} else {
-		const { data } = await receive()
-		peerPlayerUUID = data.playerUUID
-		await send({ playerUUID: clientUserUUID })
-	}
-	return peerPlayerUUID
-}
 
 type ActiveConnection = {
 	/** The backing TrysteroRoom service */
@@ -75,26 +55,31 @@ export class P2PSessionManager extends Context.Service<P2PSessionManager>()(
 						{ appId: "bogglecast-v0" },
 						lobbyId,
 						{
-							onPeerHandshake: async (peerId, send, receive, isInitiator) => {
-								const peerPlayerUUID = await onPeerHandshakeShareUUID(
-									userUUID,
-									send,
-									receive as () => Promise<{ data: { playerUUID: string } }>,
-									isInitiator
-								)
-								Effect.runSync(
-									pipe(
-										Ref.update(peerToUUIDMapRef, (map) => map.set(peerId, peerPlayerUUID)),
-										Effect.andThen(() => Atom.refresh(peerIdentitiesAtom)),
-										withSolidContextRegistry
-									)
-								)
-							},
 							onJoinError: (err) => {
 								console.error("Failed to join room", err)
 							}
 						}
 					],
+					/** Exchanges app level user UUIDs when performing a peer handshake */
+					handshake: ({ isInitiator, peerId, receive, send }: PeerHandshakeArgs<{ playerUUID: string }>) =>
+						Effect.gen(function*() {
+							if (isInitiator) {
+								yield* send({ playerUUID: userUUID })
+								const { playerUUID } = yield* receive
+								return playerUUID
+							} else {
+								const { playerUUID } = yield* receive
+								yield* send({ playerUUID: userUUID })
+								return playerUUID
+							}
+						}).pipe(
+							Effect.andThen((peerPlayerUUID) =>
+								pipe(
+									Ref.update(peerToUUIDMapRef, (map) => map.set(peerId, peerPlayerUUID))
+								)
+							),
+							Effect.andThen(() => Atom.refresh(peerIdentitiesAtom).pipe(withSolidContextRegistry))
+						),
 					actions: {}
 				}).pipe(Scope.provide(scope))
 
